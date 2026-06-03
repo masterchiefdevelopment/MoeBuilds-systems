@@ -1,9 +1,10 @@
 // Auditor Agent - reviews builder output for quality issues
+console.log('[AUDITOR] Script loaded');
 
-import 'dotenv/config';
-import { createClient } from '@supabase/supabase-js';
-import Anthropic from '@anthropic-ai/sdk';
-import fetch from 'node-fetch';
+require('dotenv/config');
+const { createClient } = require('@supabase/supabase-js');
+const { Anthropic }    = require('@anthropic-ai/sdk');
+// Node 18+ has fetch built-in — no node-fetch needed
 
 // ─── GitHub config ─────────────────────────────────────────────────────────
 const GITHUB_API   = 'https://api.github.com';

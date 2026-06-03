@@ -1,10 +1,10 @@
 // Builder Agent - reads client intake and builds the app
 console.log('[BUILDER] Script loaded');
 
-import 'dotenv/config';
-import { createClient } from '@supabase/supabase-js';
-import Anthropic from '@anthropic-ai/sdk';
-import fetch from 'node-fetch';
+require('dotenv/config');
+const { createClient } = require('@supabase/supabase-js');
+const { Anthropic }    = require('@anthropic-ai/sdk');
+// Node 18+ has fetch built-in — no node-fetch needed
 
 // ─── GitHub target repo ────────────────────────────────────────────────────
 const GITHUB_API   = 'https://api.github.com';
@@ -402,7 +402,7 @@ async function main() {
     log('TEST', `[SKIPPED] Would set status → 'auditing' and store github_branch="${branchName}"`);
 
     // Write the generated HTML to disk so it can be inspected locally
-    const { writeFileSync } = await import('fs');
+    const { writeFileSync } = require('fs');
     const outPath = 'test-output.html';
     writeFileSync(outPath, finalHtml, 'utf-8');
     log('TEST', `Generated HTML written to ${outPath} — open in a browser to preview`);

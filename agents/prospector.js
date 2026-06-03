@@ -1,8 +1,9 @@
 // Prospector Agent - finds and scores new leads
+console.log('[PROSPECTOR] Script loaded');
 
-import 'dotenv/config';
-import { createClient } from '@supabase/supabase-js';
-import fetch from 'node-fetch';
+require('dotenv/config');
+const { createClient } = require('@supabase/supabase-js');
+// Node 18+ has fetch built-in — no node-fetch needed
 
 // ─── Google Places API (legacy) ────────────────────────────────────────────
 const PLACES_BASE = 'https://maps.googleapis.com/maps/api/place';

@@ -1,13 +1,14 @@
 // QA Agent - tests for bugs before notifying owner
+console.log('[QA] Script loaded');
 
-import 'dotenv/config';
-import { createClient } from '@supabase/supabase-js';
-import { Resend } from 'resend';
-import { chromium } from 'playwright';
-import fetch from 'node-fetch';
-import { writeFileSync, unlinkSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
+require('dotenv/config');
+const { createClient }          = require('@supabase/supabase-js');
+const { Resend }                = require('resend');
+const { chromium }              = require('playwright');
+const { writeFileSync, unlinkSync } = require('fs');
+const { tmpdir }                = require('os');
+const { join }                  = require('path');
+// Node 18+ has fetch built-in — no node-fetch needed
 
 // ─── Config ────────────────────────────────────────────────────────────────
 const GITHUB_API   = 'https://api.github.com';

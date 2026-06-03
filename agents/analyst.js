@@ -1,9 +1,10 @@
 // Analyst Agent - tracks visitors and revenue per client app
+console.log('[ANALYST] Script loaded');
 
-import 'dotenv/config';
-import { createClient } from '@supabase/supabase-js';
-import Anthropic from '@anthropic-ai/sdk';
-import { Resend } from 'resend';
+require('dotenv/config');
+const { createClient } = require('@supabase/supabase-js');
+const { Anthropic }    = require('@anthropic-ai/sdk');
+const { Resend }       = require('resend');
 
 // ─── Config ────────────────────────────────────────────────────────────────
 const NOTIFY_EMAIL  = 'moebuildsco@gmail.com';
