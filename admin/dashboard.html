@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moe Builds Co. — Command Center</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0a0a0a;
+      --surface:    #141414;
+      --surface-2:  #1c1c1c;
+      --border:     #262626;
+      --accent:     #e03030;
+      --accent-hover: #c42828;
+      --text:       #f2f2f2;
+      --text-muted: #737373;
+      --text-label: #a3a3a3;
+      --radius:     10px;
+      --radius-sm:  6px;
+      --nav-h:      64px;
+    }
+
+    html, body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    body { padding-bottom: calc(var(--nav-h) + 8px); }
+
+    /* ── Sticky header ────────────────────────────────────────────── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .logo-mark {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .logo-text { display: flex; flex-direction: column; line-height: 1.25; }
+    .logo-name { font-size: 14px; font-weight: 700; }
+    .logo-sub  {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: 600;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
+
+    .header-date {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: right;
+      line-height: 1.4;
+    }
+
+    /* ── Main wrapper ─────────────────────────────────────────────── */
+    .main {
+      padding: 16px;
+      max-width: 600px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ── Section header ───────────────────────────────────────────── */
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 10px;
+    }
+
+    /* ── Stats bar ────────────────────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 6px;
+      text-align: center;
+    }
+
+    .stat-number {
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 5px;
+      min-height: 26px;
+    }
+
+    .stat-number.loading {
+      background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s infinite;
+      border-radius: 4px;
+      width: 32px;
+      margin: 0 auto 5px;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ── Builds list ──────────────────────────────────────────────── */
+    .section-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 10px;
+    }
+
+    .section-row .section-title {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .refresh-indicator {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .refresh-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22c55e;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+
+    .refresh-dot.spinning {
+      background: var(--accent);
+      animation: blink 0.7s ease-in-out infinite alternate;
+    }
+
+    @keyframes blink { to { opacity: 0.3; } }
+
+    .build-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .build-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+    }
+
+    .build-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .build-info { flex: 1; min-width: 0; }
+
+    .build-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .build-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .build-badges {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .badge {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .badge-pkg {
+      background: rgba(255,255,255,0.05);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .badge-new         { background:#1e1e1e;                  color:#a3a3a3; border:1px solid #404040; }
+    .badge-building    { background:rgba(234,179,8,.12);       color:#fbbf24; border:1px solid rgba(234,179,8,.25); animation:pulse 1.6s ease-in-out infinite; }
+    .badge-auditing    { background:rgba(59,130,246,.12);      color:#60a5fa; border:1px solid rgba(59,130,246,.25); }
+    .badge-qa          { background:rgba(168,85,247,.12);      color:#c084fc; border:1px solid rgba(168,85,247,.25); }
+    .badge-ready       { background:rgba(34,197,94,.12);       color:#4ade80; border:1px solid rgba(34,197,94,.25); }
+    .badge-delivered   { background:rgba(255,255,255,.07);     color:#e5e5e5; border:1px solid rgba(255,255,255,.15); }
+    .badge-needs_repair{ background:rgba(239,68,68,.12);       color:#f87171; border:1px solid rgba(239,68,68,.25); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.5; }
+    }
+
+    .build-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .build-url {
+      font-size: 11px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+
+    .build-url a { color: #60a5fa; text-decoration: none; }
+    .build-url a:hover { text-decoration: underline; }
+
+    .build-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .btn-approve {
+      background: rgba(34,197,94,.12);
+      border: 1px solid rgba(34,197,94,.3);
+      color: #4ade80;
+      border-radius: 5px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-approve:hover:not(:disabled) { background: rgba(34,197,94,.22); }
+    .btn-approve:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-review {
+      display: inline-flex;
+      align-items: center;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 5px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .btn-review:hover { border-color: var(--text-muted); color: var(--text); }
+
+    .empty-state {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 28px 16px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* ── Agent cards ──────────────────────────────────────────────── */
+    .agents-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .agent-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 6px;
+    }
+
+    .agent-icon  { font-size: 22px; line-height: 1; }
+    .agent-name  { font-size: 11px; font-weight: 600; color: var(--text); }
+
+    .agent-status {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .dot-active { background: #22c55e; }
+    .dot-idle   { background: #3f3f3f; }
+    .dot-sched  { background: #60a5fa; }
+
+    .agent-label { font-size: 10px; color: var(--text-muted); }
+
+    /* ── Bottom nav ───────────────────────────────────────────────── */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: var(--nav-h);
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 16px;
+      z-index: 20;
+    }
+
+    .nav-btn {
+      flex: 1;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      background: transparent;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .nav-btn:hover:not(.nav-active) {
+      background: var(--surface-2);
+      color: var(--text);
+    }
+
+    .nav-btn.nav-active {
+      background: rgba(224,48,48,.1);
+      border-color: rgba(224,48,48,.3);
+      color: var(--accent);
+    }
+
+    /* ── Responsive ───────────────────────────────────────────────── */
+    @media (max-width: 380px) {
+      .stats-grid  { grid-template-columns: repeat(2, 1fr); }
+      .agents-grid { grid-template-columns: repeat(2, 1fr); }
+      .stat-number { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ─────────────────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="logo">
+      <div class="logo-mark">M</div>
+      <div class="logo-text">
+        <span class="logo-name">Moe Builds Co.</span>
+        <span class="logo-sub">Command Center</span>
+      </div>
+    </div>
+    <div class="header-date" id="headerDate"></div>
+  </header>
+
+  <!-- ── Main ───────────────────────────────────────────────────────────── -->
+  <main class="main">
+
+    <!-- Stats bar -->
+    <section>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-number loading" id="statActive">&nbsp;</div>
+          <div class="stat-label">Active<br>Builds</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number loading" id="statReady">&nbsp;</div>
+          <div class="stat-label">Ready to<br>Deliver</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number loading" id="statDelivered">&nbsp;</div>
+          <div class="stat-label">Delivered<br>This Month</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number loading" id="statLeads">&nbsp;</div>
+          <div class="stat-label">Total<br>Leads</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Active Builds -->
+    <section>
+      <div class="section-row">
+        <div class="section-title">All Clients</div>
+        <div class="refresh-indicator">
+          <div class="refresh-dot" id="refreshDot"></div>
+          <span id="refreshLabel">Live</span>
+        </div>
+      </div>
+      <div class="build-list" id="buildList">
+        <div class="empty-state">Loading…</div>
+      </div>
+    </section>
+
+    <!-- Agent Status -->
+    <section>
+      <div class="section-title">Agent Status</div>
+      <div class="agents-grid" id="agentsGrid"></div>
+    </section>
+
+  </main>
+
+  <!-- ── Bottom nav ──────────────────────────────────────────────────────── -->
+  <nav class="bottom-nav">
+    <a href="/index.html" class="nav-btn">
+      <span>＋</span> New Client
+    </a>
+    <a href="/dashboard.html" class="nav-btn nav-active">
+      <span>◈</span> Dashboard
+    </a>
+    <a href="/review.html" class="nav-btn">
+      <span>✓</span> Review
+    </a>
+  </nav>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL      = 'https://ulzijveryrnfthschghw.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsemlqdmVyeXJuZnRoc2NoZ2h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTA4MjcsImV4cCI6MjA5NjA2NjgyN30.NIN2T5Rff2YGfpe0r5JqLewW6C5ablzzcguXdZjTZ7U';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ── Date ──────────────────────────────────────────────────────────────
+    const today = new Date();
+    document.getElementById('headerDate').innerHTML =
+      today.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) +
+      '<br><span style="font-size:10px;color:var(--text-muted);letter-spacing:.3px">' +
+      today.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + '</span>';
+
+    // ── Agent definitions ─────────────────────────────────────────────────
+    const AGENTS = [
+      { name: 'Builder',    icon: '🔨', stages: ['new', 'building'] },
+      { name: 'Auditor',    icon: '🔍', stages: ['auditing'] },
+      { name: 'QA',         icon: '✅', stages: ['qa'] },
+      { name: 'Analyst',    icon: '📊', stages: null, schedule: 'Weekly' },
+      { name: 'Security',   icon: '🛡️',  stages: null, schedule: 'Daily' },
+      { name: 'Prospector', icon: '🎯', stages: null, schedule: 'Manual' },
+    ];
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+    function timeAgo(iso) {
+      const diff = Date.now() - new Date(iso).getTime();
+      const m = Math.floor(diff / 60000);
+      if (m < 1)  return 'just now';
+      if (m < 60) return `${m}m ago`;
+      const h = Math.floor(m / 60);
+      if (h < 24) return `${h}h ago`;
+      return `${Math.floor(h / 24)}d ago`;
+    }
+
+    function statusClass(s) {
+      const map = {
+        new: 'badge-new', building: 'badge-building', auditing: 'badge-auditing',
+        qa: 'badge-qa', ready: 'badge-ready', delivered: 'badge-delivered',
+        needs_repair: 'badge-needs_repair',
+      };
+      return map[s] || 'badge-new';
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────
+    function renderStats(clients, leadsCount) {
+      const now        = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+      const active    = clients.filter(c => ['building','auditing','qa'].includes(c.status)).length;
+      const ready     = clients.filter(c => c.status === 'ready').length;
+      const delivered = clients.filter(c => c.status === 'delivered' && c.updated_at >= monthStart).length;
+
+      [
+        ['statActive', active],
+        ['statReady', ready],
+        ['statDelivered', delivered],
+        ['statLeads', leadsCount ?? '—'],
+      ].forEach(([id, val]) => {
+        const el = document.getElementById(id);
+        el.textContent = val;
+        el.classList.remove('loading');
+      });
+    }
+
+    function renderBuilds(clients) {
+      const list = document.getElementById('buildList');
+
+      if (!clients.length) {
+        list.innerHTML = '<div class="empty-state">No clients yet — add one with New Client.</div>';
+        return;
+      }
+
+      list.innerHTML = clients.map(c => {
+        const urlPart = c.preview_url
+          ? `<div class="build-url"><a href="${c.preview_url}" target="_blank" rel="noopener">↗ ${c.preview_url.replace(/^https?:\/\//, '')}</a></div>`
+          : `<div class="build-url" style="color:#404040;font-size:10px">No preview URL</div>`;
+
+        const approvePart = c.status === 'ready'
+          ? `<button class="btn-approve" onclick="approveClient('${c.id}', this)">Approve</button>`
+          : '';
+
+        return `
+          <div class="build-card">
+            <div class="build-top">
+              <div class="build-info">
+                <div class="build-name">${c.business_name}</div>
+                <div class="build-meta">${c.business_type || '—'} &middot; ${timeAgo(c.created_at)}</div>
+              </div>
+              <div class="build-badges">
+                <span class="badge badge-pkg">${c.package || '—'}</span>
+                <span class="badge ${statusClass(c.status)}">${c.status.replace('_', ' ')}</span>
+              </div>
+            </div>
+            <div class="build-footer">
+              ${urlPart}
+              <div class="build-actions">
+                ${approvePart}
+                <a href="/review.html?client_id=${c.id}" class="btn-review">Review</a>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function renderAgents(clients) {
+      const counts = {};
+      clients.forEach(c => { counts[c.status] = (counts[c.status] || 0) + 1; });
+
+      document.getElementById('agentsGrid').innerHTML = AGENTS.map(a => {
+        let dotClass, label;
+        if (a.schedule) {
+          dotClass = 'dot-sched';
+          label = a.schedule;
+        } else {
+          const busy = a.stages.some(s => counts[s] > 0);
+          dotClass = busy ? 'dot-active' : 'dot-idle';
+          label = busy ? 'Active' : 'Idle';
+        }
+        return `
+          <div class="agent-card">
+            <div class="agent-icon">${a.icon}</div>
+            <div class="agent-name">${a.name}</div>
+            <div class="agent-status">
+              <div class="status-dot ${dotClass}"></div>
+              <span class="agent-label">${label}</span>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // ── Approve ───────────────────────────────────────────────────────────
+    async function approveClient(id, btn) {
+      if (!confirm('Mark this client as delivered?')) return;
+      btn.disabled = true;
+      btn.textContent = '…';
+      const { error } = await db.from('clients').update({ status: 'delivered' }).eq('id', id);
+      if (error) {
+        alert('Error: ' + error.message);
+        btn.disabled = false;
+        btn.textContent = 'Approve';
+      } else {
+        refresh();
+      }
+    }
+
+    // ── Refresh ───────────────────────────────────────────────────────────
+    async function refresh() {
+      const dot   = document.getElementById('refreshDot');
+      const label = document.getElementById('refreshLabel');
+      dot.classList.add('spinning');
+      label.textContent = 'Refreshing…';
+
+      try {
+        const [clientsRes, leadsRes] = await Promise.all([
+          db.from('clients').select('*').order('created_at', { ascending: false }),
+          db.from('leads').select('id', { count: 'exact', head: true }),
+        ]);
+
+        if (clientsRes.error) throw clientsRes.error;
+
+        const clients = clientsRes.data || [];
+        const leads   = leadsRes.error ? null : leadsRes.count;
+
+        renderStats(clients, leads);
+        renderBuilds(clients);
+        renderAgents(clients);
+
+        dot.classList.remove('spinning');
+        dot.style.background = '#22c55e';
+        label.textContent = 'Live';
+
+      } catch (err) {
+        console.error('Refresh failed:', err);
+        dot.classList.remove('spinning');
+        dot.style.background = '#e03030';
+        label.textContent = 'Error';
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 30000);
+  </script>
+</body>
+</html>
