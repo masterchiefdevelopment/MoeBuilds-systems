@@ -1,45 +1,45 @@
 # MoeBuilds Agent Pipeline
 #
-# Webhook triggers (builder / auditor / qa)
-# ──────────────────────────────────────────
-# These jobs fire via GitHub's repository_dispatch API, which Supabase
-# Database Webhooks call whenever a row changes status.
-#
-# Set up three webhooks in Supabase → Database → Webhooks:
-#
-#   1. Table: clients | Event: INSERT | Filter: status = 'new'
-#      POST https://api.github.com/repos/masterchiefdevelopment/MoeBuilds-systems/dispatches
-#      Headers: Authorization: Bearer <GH_PAT>, Content-Type: application/json
-#      Body: { "event_type": "client-new", "client_payload": { "client_id": "{{NEW.id}}" } }
-#
-#   2. Table: clients | Event: UPDATE | Filter: status = 'auditing'
-#      Body: { "event_type": "client-auditing" }
-#
-#   3. Table: clients | Event: UPDATE | Filter: status = 'qa'
-#      Body: { "event_type": "client-qa" }
+# Trigger architecture
+# ────────────────────
+# Pipeline jobs (builder / auditor / qa) are triggered via GitHub's
+# workflow_dispatch API, which Supabase Edge Functions call whenever a row
+# changes status.  Schedule jobs (security / analyst) fire on cron.
 #
 # GitHub Secrets required (Settings → Secrets → Actions):
-#   SUPABASE_URL, SUPABASE_ANON_KEY, ANTHROPIC_API_KEY,
-#   RESEND_API_KEY, GH_PAT (Personal Access Token — needed for
-#   cross-repo operations in builder/auditor), GH_OWNER, GH_REPO
+#   SUPABASE_URL       — Supabase project URL
+#   SUPABASE_ANON_KEY  — Supabase anon/public key
+#   ANTHROPIC_API_KEY  — Anthropic API key (builder / auditor / analyst)
+#   RESEND_API_KEY     — Resend API key (qa / security / analyst)
+#   GH_PAT             — GitHub Personal Access Token (cross-repo access)
+#   GH_OWNER           — Target repo owner  (e.g. masterchiefdevelopment)
+#   GH_REPO            — Target repo name   (e.g. moe-builds-co)
 
 name: MoeBuilds Agent Pipeline
 
 on:
-  repository_dispatch:
-    types: [client-new, client-auditing, client-qa]
+  workflow_dispatch:
+    inputs:
+      client_id:
+        description: 'Client ID to process'
+        required: false
+        default: ''
+      action:
+        description: 'Action to run: build | audit | qa'
+        required: true
+        default: 'build'
   schedule:
-    - cron: '0 0 * * *'    # security.js  — daily at midnight UTC
-    - cron: '0 8 * * 1'    # analyst.js   — every Monday at 08:00 UTC
+    - cron: '0 0 * * *'   # security — daily at midnight UTC
+    - cron: '0 8 * * 1'   # analyst  — every Monday at 08:00 UTC
 
 # ── Builder ──────────────────────────────────────────────────────────────────
-# Fires when Supabase inserts a new client row (status = 'new').
-# The webhook must include client_payload.client_id.
+# Triggered by the trigger-builder Supabase Edge Function when a client row
+# is inserted with status = 'new'.  Requires inputs.client_id.
 jobs:
   builder:
     name: Builder Agent
     runs-on: ubuntu-latest
-    if: github.event_name == 'repository_dispatch' && github.event.action == 'client-new'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'build'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,15 +61,15 @@ jobs:
           GITHUB_TOKEN:      ${{ secrets.GH_PAT }}
           GH_OWNER:          ${{ secrets.GH_OWNER }}
           GH_REPO:           ${{ secrets.GH_REPO }}
-        run: node agents/builder.js ${{ github.event.client_payload.client_id }}
+        run: node agents/builder.js ${{ github.event.inputs.client_id }}
 
 # ── Auditor ───────────────────────────────────────────────────────────────────
-# Fires when a client's status changes to 'auditing'.
-# Reads the oldest auditing record from the queue — no client_id needed.
+# Triggered by the trigger-auditor Supabase Edge Function when a client row
+# status changes to 'auditing'.  Picks the oldest queued record automatically.
   auditor:
     name: Auditor Agent
     runs-on: ubuntu-latest
-    if: github.event_name == 'repository_dispatch' && github.event.action == 'client-auditing'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'audit'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -94,12 +94,12 @@ jobs:
         run: node agents/auditor.js
 
 # ── QA ────────────────────────────────────────────────────────────────────────
-# Fires when a client's status changes to 'qa'.
-# Reads the oldest qa record from the queue — no client_id needed.
+# Triggered by the trigger-qa Supabase Edge Function when a client row
+# status changes to 'qa'.  Picks the oldest queued record automatically.
   qa:
     name: QA Agent
     runs-on: ubuntu-latest
-    if: github.event_name == 'repository_dispatch' && github.event.action == 'client-qa'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'qa'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
