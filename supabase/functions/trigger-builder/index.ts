@@ -62,10 +62,9 @@ serve(async (req: Request): Promise<Response> => {
   const ghRes = await fetch(url, {
     method: 'POST',
     headers: {
-      Authorization:          `Bearer ${pat}`,
-      Accept:                 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'Content-Type':         'application/json',
+      Authorization: `Bearer ${pat}`,
+      Accept:        'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       ref:    BRANCH,

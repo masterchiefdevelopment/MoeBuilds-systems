@@ -17,17 +17,18 @@ returns trigger language plpgsql security definer as $$
 begin
   if new.status = 'new' then
     perform net.http_post(
-      url     := 'https://ulzijveryrnfthschghw.supabase.co/functions/v1/trigger-builder',
-      headers := jsonb_build_object(
+      url                  := 'https://ulzijveryrnfthschghw.supabase.co/functions/v1/trigger-builder',
+      headers              := jsonb_build_object(
         'Content-Type',  'application/json',
         'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsemlqdmVyeXJuZnRoc2NoZ2h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTA4MjcsImV4cCI6MjA5NjA2NjgyN30.NIN2T5Rff2YGfpe0r5JqLewW6C5ablzzcguXdZjTZ7U'
       ),
-      body    := jsonb_build_object(
+      body                 := jsonb_build_object(
         'type',   'INSERT',
         'table',  'clients',
         'schema', 'public',
         'record', row_to_json(new)::jsonb
-      )::text
+      ),
+      timeout_milliseconds := 5000
     );
   end if;
   return new;
@@ -48,18 +49,19 @@ returns trigger language plpgsql security definer as $$
 begin
   if new.status = 'auditing' and old.status <> 'auditing' then
     perform net.http_post(
-      url     := 'https://ulzijveryrnfthschghw.supabase.co/functions/v1/trigger-auditor',
-      headers := jsonb_build_object(
+      url                  := 'https://ulzijveryrnfthschghw.supabase.co/functions/v1/trigger-auditor',
+      headers              := jsonb_build_object(
         'Content-Type',  'application/json',
         'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsemlqdmVyeXJuZnRoc2NoZ2h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTA4MjcsImV4cCI6MjA5NjA2NjgyN30.NIN2T5Rff2YGfpe0r5JqLewW6C5ablzzcguXdZjTZ7U'
       ),
-      body    := jsonb_build_object(
+      body                 := jsonb_build_object(
         'type',       'UPDATE',
         'table',      'clients',
         'schema',     'public',
         'record',     row_to_json(new)::jsonb,
         'old_record', row_to_json(old)::jsonb
-      )::text
+      ),
+      timeout_milliseconds := 5000
     );
   end if;
   return new;
@@ -80,18 +82,19 @@ returns trigger language plpgsql security definer as $$
 begin
   if new.status = 'qa' and old.status <> 'qa' then
     perform net.http_post(
-      url     := 'https://ulzijveryrnfthschghw.supabase.co/functions/v1/trigger-qa',
-      headers := jsonb_build_object(
+      url                  := 'https://ulzijveryrnfthschghw.supabase.co/functions/v1/trigger-qa',
+      headers              := jsonb_build_object(
         'Content-Type',  'application/json',
         'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsemlqdmVyeXJuZnRoc2NoZ2h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTA4MjcsImV4cCI6MjA5NjA2NjgyN30.NIN2T5Rff2YGfpe0r5JqLewW6C5ablzzcguXdZjTZ7U'
       ),
-      body    := jsonb_build_object(
+      body                 := jsonb_build_object(
         'type',       'UPDATE',
         'table',      'clients',
         'schema',     'public',
         'record',     row_to_json(new)::jsonb,
         'old_record', row_to_json(old)::jsonb
-      )::text
+      ),
+      timeout_milliseconds := 5000
     );
   end if;
   return new;
