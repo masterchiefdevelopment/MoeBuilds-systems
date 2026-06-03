@@ -1,6 +1,7 @@
 {
   "name": "moebuilds-system",
   "version": "1.0.0",
+  "type": "module",
   "dependencies": {
     "@anthropic-ai/sdk": "latest",
     "@supabase/supabase-js": "latest",
