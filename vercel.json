@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "outputDirectory": "admin",
+  "buildCommand": null,
+  "framework": null,
+  "routes": [
+    { "src": "/review", "dest": "/review.html" },
+    { "src": "/(.*)", "dest": "/$1" }
+  ]
+}
