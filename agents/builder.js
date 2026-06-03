@@ -1,4 +1,5 @@
 // Builder Agent - reads client intake and builds the app
+console.log('[BUILDER] Script loaded');
 
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
@@ -294,17 +295,18 @@ async function main() {
   const TEST_MODE = process.argv.includes('--test');
 
   // Step 1: Validate CLI arguments
-  // In test mode a client_id is not needed; in normal mode it is required.
-  const clientId = process.argv.find(a => !a.startsWith('-') && a !== process.argv[1]);
+  // slice(2) skips argv[0] (node binary) and argv[1] (script path).
+  const clientId = process.argv.slice(2).find(a => !a.startsWith('-'));
   if (!TEST_MODE && !clientId) {
     console.error('Usage: node agents/builder.js <client_id>');
     console.error('       node agents/builder.js --test');
     process.exit(1);
   }
 
-  // In test mode only ANTHROPIC_API_KEY is exercised; skip Supabase + GitHub checks.
+  // In test mode, skip Supabase + GitHub checks.
+  // ANTHROPIC_API_KEY or ANTHROPIC_BASE_URL (proxy) is sufficient for Claude calls.
   const required = TEST_MODE
-    ? ['ANTHROPIC_API_KEY']
+    ? []
     : ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'ANTHROPIC_API_KEY', 'GITHUB_TOKEN'];
   const missing = required.filter(k => !process.env[k]);
   if (missing.length) {
@@ -312,7 +314,12 @@ async function main() {
     process.exit(1);
   }
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  // ANTHROPIC_BASE_URL is set in Claude Code environments — the proxy handles auth.
+  // Fall back to a placeholder so the SDK constructs without throwing.
+  const anthropic = new Anthropic({
+    apiKey:  process.env.ANTHROPIC_API_KEY || 'placeholder',
+    baseURL: process.env.ANTHROPIC_BASE_URL,
+  });
   const supabase  = TEST_MODE
     ? null
     : createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
