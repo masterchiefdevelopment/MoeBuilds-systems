@@ -10,6 +10,15 @@ const GITHUB_API   = 'https://api.github.com';
 const GITHUB_OWNER = process.env.GITHUB_OWNER || 'masterchiefdevelopment';
 const GITHUB_REPO  = process.env.GITHUB_REPO  || 'moe-builds-co';
 
+// ─── Test mode: fake client used when --test flag is passed ────────────────
+const TEST_CLIENT = {
+  id:            'test-001',
+  business_name: 'Via 313 Pizza',
+  business_type: 'foodtruck',
+  package:       'standard',
+  brand_color:   '#E03030',
+};
+
 // ─── Logging helper ────────────────────────────────────────────────────────
 function log(step, msg) {
   console.log(`[BUILDER][${step}] ${msg}`);
@@ -282,54 +291,75 @@ async function createBranchAndPush(branchName, files, commitMessage) {
 
 // ─── Main orchestration ────────────────────────────────────────────────────
 async function main() {
-  // Step 1: Validate CLI argument
-  const clientId = process.argv[2];
-  if (!clientId) {
+  const TEST_MODE = process.argv.includes('--test');
+
+  // Step 1: Validate CLI arguments
+  // In test mode a client_id is not needed; in normal mode it is required.
+  const clientId = process.argv.find(a => !a.startsWith('-') && a !== process.argv[1]);
+  if (!TEST_MODE && !clientId) {
     console.error('Usage: node agents/builder.js <client_id>');
+    console.error('       node agents/builder.js --test');
     process.exit(1);
   }
 
-  // Validate required env vars before doing any work
-  const required = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'ANTHROPIC_API_KEY', 'GITHUB_TOKEN'];
-  const missing  = required.filter(k => !process.env[k]);
+  // In test mode only ANTHROPIC_API_KEY is exercised; skip Supabase + GitHub checks.
+  const required = TEST_MODE
+    ? ['ANTHROPIC_API_KEY']
+    : ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'ANTHROPIC_API_KEY', 'GITHUB_TOKEN'];
+  const missing = required.filter(k => !process.env[k]);
   if (missing.length) {
     console.error(`[BUILDER] Missing env vars: ${missing.join(', ')}`);
     process.exit(1);
   }
 
-  const supabase  = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const supabase  = TEST_MODE
+    ? null
+    : createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
-  log('START', `Builder Agent initializing — client_id: ${clientId}`);
-
-  // Step 2: Read client record from Supabase
-  log('SUPABASE', `Fetching client record id=${clientId}`);
-  const { data: client, error: fetchError } = await supabase
-    .from('clients')
-    .select('*')
-    .eq('id', clientId)
-    .single();
-
-  if (fetchError || !client) {
-    console.error(`[BUILDER] Failed to fetch client: ${fetchError?.message ?? 'no record found'}`);
-    process.exit(1);
+  if (TEST_MODE) {
+    log('START', '*** TEST MODE — using fake client, skipping Supabase and GitHub ***');
   }
-  log('SUPABASE', `Client: "${client.business_name}" | type: ${client.business_type} | pkg: ${client.package}`);
+  log('START', `Builder Agent initializing — ${TEST_MODE ? 'test run' : `client_id: ${clientId}`}`);
+
+  // Step 2: Load client record (real Supabase fetch or test fixture)
+  let client;
+  if (TEST_MODE) {
+    client = TEST_CLIENT;
+    log('TEST', `Using fake client: "${client.business_name}" | type: ${client.business_type} | pkg: ${client.package}`);
+  } else {
+    log('SUPABASE', `Fetching client record id=${clientId}`);
+    const { data, error: fetchError } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', clientId)
+      .single();
+    if (fetchError || !data) {
+      console.error(`[BUILDER] Failed to fetch client: ${fetchError?.message ?? 'no record found'}`);
+      process.exit(1);
+    }
+    client = data;
+    log('SUPABASE', `Client: "${client.business_name}" | type: ${client.business_type} | pkg: ${client.package}`);
+  }
 
   // Step 3: Set status → 'building'
-  log('SUPABASE', `Updating status → 'building'`);
-  const { error: buildingErr } = await supabase
-    .from('clients')
-    .update({ status: 'building' })
-    .eq('id', clientId);
-  if (buildingErr) throw new Error(`Status update failed: ${buildingErr.message}`);
+  if (TEST_MODE) {
+    log('TEST', `[SKIPPED] Would set status → 'building' for id=${client.id}`);
+  } else {
+    log('SUPABASE', `Updating status → 'building'`);
+    const { error: buildingErr } = await supabase
+      .from('clients')
+      .update({ status: 'building' })
+      .eq('id', clientId);
+    if (buildingErr) throw new Error(`Status update failed: ${buildingErr.message}`);
+  }
 
   // Step 4: Select template based on business_type × package
   log('TEMPLATE', `Loading template for ${client.business_type}/${client.package}`);
   const templateHtml = selectTemplate(client.business_type, client.package);
   log('TEMPLATE', 'Template loaded');
 
-  // Step 5: Generate customized content via Claude
+  // Step 5: Generate customized content via Claude (runs in both modes)
   const content = await generateContent(client, anthropic);
   log('CLAUDE', `Headline: "${content.hero_headline}"`);
 
@@ -340,19 +370,15 @@ async function main() {
   // Step 7: Determine branch name
   const slug       = slugify(client.business_name);
   const branchName = `client/${slug}`;
-  log('GITHUB', `Target branch: ${branchName}`);
 
-  // Step 8: Create branch and push files to GitHub
+  // Step 8: Create branch and push files to GitHub (skipped in test mode)
   const files = [
-    {
-      path:    'index.html',
-      content: finalHtml,
-    },
+    { path: 'index.html', content: finalHtml },
     {
       // Metadata snapshot so the Auditor agent can read build context
       path:    'site.json',
       content: JSON.stringify({
-        client_id:    clientId,
+        client_id:     client.id,
         business_name: client.business_name,
         business_type: client.business_type,
         package:       client.package,
@@ -363,22 +389,36 @@ async function main() {
     },
   ];
 
-  const commitSha = await createBranchAndPush(
-    branchName,
-    files,
-    `feat: generated site for ${client.business_name} (${client.package} tier)`
-  );
-  log('GITHUB', `Branch ready — commit ${commitSha.slice(0, 7)}`);
+  if (TEST_MODE) {
+    log('TEST', `[SKIPPED] Would create GitHub branch "${branchName}" in ${GITHUB_OWNER}/${GITHUB_REPO}`);
+    log('TEST', `[SKIPPED] Would push ${files.length} file(s): ${files.map(f => f.path).join(', ')}`);
+    log('TEST', `[SKIPPED] Would set status → 'auditing' and store github_branch="${branchName}"`);
 
-  // Step 9: Set status → 'auditing' and record the branch
-  log('SUPABASE', `Updating status → 'auditing'`);
-  const { error: auditingErr } = await supabase
-    .from('clients')
-    .update({ status: 'auditing', github_branch: branchName })
-    .eq('id', clientId);
-  if (auditingErr) throw new Error(`Status update to auditing failed: ${auditingErr.message}`);
+    // Write the generated HTML to disk so it can be inspected locally
+    const { writeFileSync } = await import('fs');
+    const outPath = 'test-output.html';
+    writeFileSync(outPath, finalHtml, 'utf-8');
+    log('TEST', `Generated HTML written to ${outPath} — open in a browser to preview`);
 
-  log('DONE', `Builder complete. Branch: ${branchName} | Commit: ${commitSha.slice(0, 7)}`);
+    log('DONE', `Test run complete. Claude API is working. Hero: "${content.hero_headline}"`);
+  } else {
+    const commitSha = await createBranchAndPush(
+      branchName,
+      files,
+      `feat: generated site for ${client.business_name} (${client.package} tier)`
+    );
+    log('GITHUB', `Branch ready — commit ${commitSha.slice(0, 7)}`);
+
+    // Step 9: Set status → 'auditing' and record the branch
+    log('SUPABASE', `Updating status → 'auditing'`);
+    const { error: auditingErr } = await supabase
+      .from('clients')
+      .update({ status: 'auditing', github_branch: branchName })
+      .eq('id', clientId);
+    if (auditingErr) throw new Error(`Status update to auditing failed: ${auditingErr.message}`);
+
+    log('DONE', `Builder complete. Branch: ${branchName} | Commit: ${commitSha.slice(0, 7)}`);
+  }
 }
 
 main().catch(err => {
