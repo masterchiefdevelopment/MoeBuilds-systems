@@ -8,8 +8,8 @@ const { Anthropic }    = require('@anthropic-ai/sdk');
 
 // ─── GitHub config ─────────────────────────────────────────────────────────
 const GITHUB_API   = 'https://api.github.com';
-const GITHUB_OWNER = process.env.GITHUB_OWNER || 'masterchiefdevelopment';
-const GITHUB_REPO  = process.env.GITHUB_REPO  || 'moe-builds-co';
+const GITHUB_OWNER = process.env.GH_OWNER || 'masterchiefdevelopment';
+const GITHUB_REPO  = process.env.GH_REPO  || 'moe-builds-co';
 
 // ─── Logging helper ────────────────────────────────────────────────────────
 function log(step, msg) {

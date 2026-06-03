@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "admin/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    { "src": "/",          "dest": "/admin/index.html" },
+    { "src": "/dashboard", "dest": "/admin/dashboard.html" },
+    { "src": "/review",    "dest": "/admin/review.html" },
+    { "src": "/(.*)",      "dest": "/admin/$1" }
+  ]
+}

@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moe Builds Co. — Review Client</title>
+  <style>
+    /* ── Reset & base ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #0a0a0a;
+      --surface:      #141414;
+      --surface-2:    #1c1c1c;
+      --surface-3:    #222222;
+      --border:       #262626;
+      --accent:       #e03030;
+      --accent-hover: #c42828;
+      --text:         #f2f2f2;
+      --text-muted:   #737373;
+      --text-label:   #a3a3a3;
+      --green:        #16a34a;
+      --green-bg:     #0d1f13;
+      --green-border: #166534;
+      --green-text:   #4ade80;
+      --red-bg:       #1f0d0d;
+      --red-border:   #991b1b;
+      --red-text:     #f87171;
+      --radius:       10px;
+      --radius-sm:    6px;
+    }
+
+    html, body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px 80px;
+    }
+
+    /* ── Header ────────────────────────────────────────────────────── */
+    .header {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .logo-mark {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .logo-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .page-title {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* ── Card ──────────────────────────────────────────────────────── */
+    .card {
+      width: 100%;
+      max-width: 560px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    /* ── Loading / error states ────────────────────────────────────── */
+    .state {
+      padding: 56px 32px;
+      text-align: center;
+      display: none;
+    }
+
+    .state.visible { display: block; }
+
+    .state-icon {
+      font-size: 32px;
+      margin-bottom: 14px;
+    }
+
+    .state h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .state p {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .spinner-wrap {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Client info panel ─────────────────────────────────────────── */
+    #clientPanel { display: none; }
+    #clientPanel.visible { display: block; }
+
+    .client-hero {
+      padding: 24px 24px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .client-hero-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .client-name {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      line-height: 1.2;
+    }
+
+    /* ── Status badge ──────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .badge-new           { background: rgba(59,130,246,.15); color: #60a5fa; }
+    .badge-new .badge-dot           { background: #60a5fa; }
+
+    .badge-building      { background: rgba(234,179,8,.12);  color: #facc15; }
+    .badge-building .badge-dot      { background: #facc15; }
+
+    .badge-auditing      { background: rgba(168,85,247,.12); color: #c084fc; }
+    .badge-auditing .badge-dot      { background: #c084fc; }
+
+    .badge-qa            { background: rgba(20,184,166,.12); color: #2dd4bf; }
+    .badge-qa .badge-dot            { background: #2dd4bf; }
+
+    .badge-ready         { background: rgba(34,197,94,.12);  color: #86efac; }
+    .badge-ready .badge-dot         { background: #86efac; }
+
+    .badge-delivered     { background: rgba(22,163,74,.15);  color: #4ade80; }
+    .badge-delivered .badge-dot     { background: #4ade80; }
+
+    .badge-needs_repair  { background: rgba(239,68,68,.12);  color: #f87171; }
+    .badge-needs_repair .badge-dot  { background: #f87171; }
+
+    .badge-default       { background: var(--surface-2); color: var(--text-muted); }
+    .badge-default .badge-dot       { background: var(--text-muted); }
+
+    /* ── Meta row ──────────────────────────────────────────────────── */
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .meta-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 3px 9px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .meta-chip strong { color: var(--text); font-weight: 500; }
+
+    /* ── Detail rows ───────────────────────────────────────────────── */
+    .detail-section {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .detail-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      min-width: 100px;
+      padding-top: 1px;
+      flex-shrink: 0;
+    }
+
+    .detail-value {
+      font-size: 13px;
+      color: var(--text);
+      text-align: right;
+    }
+
+    .detail-value a {
+      color: #60a5fa;
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .detail-value a:hover { text-decoration: underline; }
+
+    .color-swatch {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      display: inline-block;
+      flex-shrink: 0;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    /* ── Existing notes (audit_notes / qa_notes) ───────────────────── */
+    .notes-box {
+      margin: 0 24px;
+      background: var(--red-bg);
+      border: 1px solid var(--red-border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-size: 13px;
+      color: var(--red-text);
+      line-height: 1.6;
+    }
+
+    .notes-box-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: #f87171;
+      margin-bottom: 5px;
+    }
+
+    /* ── Action area ───────────────────────────────────────────────── */
+    .action-area {
+      padding: 20px 24px;
+    }
+
+    .action-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 13px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s, opacity 0.15s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn:active:not(:disabled) { transform: scale(0.99); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-approve {
+      background: #16a34a;
+      color: #fff;
+    }
+
+    .btn-approve:hover:not(:disabled) { background: #15803d; }
+
+    .btn-sendback {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-sendback:hover:not(:disabled) {
+      background: var(--surface-3);
+      border-color: #444;
+    }
+
+    /* ── Send back form ────────────────────────────────────────────── */
+    .sendback-form {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .sendback-form.visible { display: flex; }
+
+    .sendback-form label {
+      font-size: 13px;
+      color: var(--text-label);
+      font-weight: 500;
+    }
+
+    textarea {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      padding: 10px 13px;
+      resize: vertical;
+      min-height: 100px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(224,48,48,.12);
+    }
+
+    textarea::placeholder { color: var(--text-muted); }
+
+    .sendback-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-confirm-sendback {
+      flex: 1;
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-confirm-sendback:hover:not(:disabled) { background: var(--accent-hover); }
+
+    .btn-cancel {
+      flex: 1;
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-cancel:hover:not(:disabled) { border-color: #444; color: var(--text); }
+
+    /* ── Toast / result message ────────────────────────────────────── */
+    .result-msg {
+      display: none;
+      margin: 0 24px 20px;
+      padding: 13px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .result-msg.success {
+      display: block;
+      background: var(--green-bg);
+      border: 1px solid var(--green-border);
+      color: var(--green-text);
+    }
+
+    .result-msg.error {
+      display: block;
+      background: var(--red-bg);
+      border: 1px solid var(--red-border);
+      color: var(--red-text);
+    }
+
+    /* ── Already-actioned state ────────────────────────────────────── */
+    .actioned-banner {
+      display: none;
+      margin: 0 24px 20px;
+      padding: 13px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .actioned-banner.visible { display: block; }
+
+    /* ── Responsive ────────────────────────────────────────────────── */
+    @media (min-width: 480px) {
+      .action-buttons {
+        flex-direction: row;
+      }
+
+      .detail-row { align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <a class="logo" href="index.html">
+      <div class="logo-mark">M</div>
+      <span class="logo-name">Moe Builds Co.</span>
+    </a>
+    <span class="page-title">Client Review</span>
+  </div>
+
+  <div class="card">
+
+    <!-- Loading -->
+    <div class="state visible" id="stateLoading">
+      <div class="spinner-wrap"><div class="spinner"></div></div>
+      <p style="color:var(--text-muted);font-size:14px">Loading client record…</p>
+    </div>
+
+    <!-- No client_id -->
+    <div class="state" id="stateNoId">
+      <div class="state-icon">⚠️</div>
+      <h2>No Client ID</h2>
+      <p>Open this page as <code style="font-size:12px;background:var(--surface-2);padding:2px 6px;border-radius:4px">review.html?client_id=…</code></p>
+    </div>
+
+    <!-- Not found -->
+    <div class="state" id="stateNotFound">
+      <div class="state-icon">🔍</div>
+      <h2>Client Not Found</h2>
+      <p id="notFoundMsg">No record matched that client ID.</p>
+    </div>
+
+    <!-- Client panel -->
+    <div id="clientPanel">
+
+      <!-- Hero -->
+      <div class="client-hero">
+        <div class="client-hero-top">
+          <div class="client-name" id="clientName"></div>
+          <div id="statusBadge" class="badge"></div>
+        </div>
+        <div class="meta-row">
+          <span class="meta-chip">Type: <strong id="clientType"></strong></span>
+          <span class="meta-chip">Package: <strong id="clientPkg"></strong></span>
+          <span class="meta-chip" id="colorChip" style="display:none">
+            Color: <span class="color-swatch"><span class="swatch" id="colorSwatch"></span><strong id="clientColor"></strong></span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Details -->
+      <div class="detail-section">
+        <div class="detail-row">
+          <span class="detail-label">Owner</span>
+          <span class="detail-value" id="clientOwner"></span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Email</span>
+          <span class="detail-value" id="clientEmail"></span>
+        </div>
+        <div class="detail-row" id="phoneRow">
+          <span class="detail-label">Phone</span>
+          <span class="detail-value" id="clientPhone"></span>
+        </div>
+        <div class="detail-row" id="previewRow" style="display:none">
+          <span class="detail-label">Preview URL</span>
+          <span class="detail-value"><a id="previewLink" href="#" target="_blank" rel="noopener"></a></span>
+        </div>
+        <div class="detail-row" id="branchRow" style="display:none">
+          <span class="detail-label">GitHub Branch</span>
+          <span class="detail-value" id="clientBranch" style="font-family:monospace;font-size:12px"></span>
+        </div>
+      </div>
+
+      <!-- Existing notes from prior agents -->
+      <div id="notesWrap" style="display:none;padding:16px 24px 0">
+        <div class="notes-box">
+          <div class="notes-box-label" id="notesLabel">Agent Notes</div>
+          <div id="notesBody"></div>
+        </div>
+      </div>
+
+      <!-- Result message -->
+      <div class="result-msg" id="resultMsg"></div>
+
+      <!-- Already-actioned banner -->
+      <div class="actioned-banner" id="actionedBanner"></div>
+
+      <!-- Actions -->
+      <div class="action-area" id="actionArea">
+
+        <!-- Primary buttons -->
+        <div class="action-buttons" id="primaryButtons">
+          <button class="btn btn-approve" id="btnApprove">
+            ✓ Approve — Mark as Delivered
+          </button>
+          <button class="btn btn-sendback" id="btnSendback">
+            ↩ Send Back with Notes
+          </button>
+        </div>
+
+        <!-- Send-back form (hidden until Send Back is clicked) -->
+        <div class="sendback-form" id="sendbackForm">
+          <label for="reviewNotes">Notes for the builder:</label>
+          <textarea id="reviewNotes" placeholder="Describe what needs to be fixed…" rows="4"></textarea>
+          <div class="sendback-actions">
+            <button class="btn btn-confirm-sendback" id="btnConfirmSendback">Send Back</button>
+            <button class="btn btn-cancel" id="btnCancel">Cancel</button>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /clientPanel -->
+
+  </div><!-- /card -->
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // ── Supabase config ─────────────────────────────────────────────────────
+    const SUPABASE_URL      = 'https://ulzijveryrnfthschghw.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsemlqdmVyeXJuZnRoc2NoZ2h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTA4MjcsImV4cCI6MjA5NjA2NjgyN30.NIN2T5Rff2YGfpe0r5JqLewW6C5ablzzcguXdZjTZ7U';
+
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+    function show(id)  { document.getElementById(id).classList.add('visible'); }
+    function hide(id)  { document.getElementById(id).classList.remove('visible'); }
+
+    function setState(name) {
+      ['stateLoading','stateNoId','stateNotFound'].forEach(s => {
+        document.getElementById(s).classList.toggle('visible', s === name);
+      });
+    }
+
+    function statusBadgeClass(status) {
+      const known = ['new','building','auditing','qa','ready','delivered','needs_repair'];
+      return known.includes(status) ? `badge-${status}` : 'badge-default';
+    }
+
+    function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+
+    // ── Load client ─────────────────────────────────────────────────────────
+    const params   = new URLSearchParams(window.location.search);
+    const clientId = params.get('client_id');
+
+    let currentClient = null;
+    let isSubmitting  = false;
+
+    async function loadClient() {
+      if (!clientId) { setState('stateNoId'); return; }
+
+      setState('stateLoading');
+
+      const { data, error } = await db
+        .from('clients')
+        .select('*')
+        .eq('id', clientId)
+        .single();
+
+      if (error || !data) {
+        setState('stateNotFound');
+        document.getElementById('notFoundMsg').textContent =
+          error?.message || 'No record matched that client ID.';
+        return;
+      }
+
+      currentClient = data;
+      renderClient(data);
+    }
+
+    function renderClient(c) {
+      // Hide loading, show panel
+      setState(null);
+      document.getElementById('clientPanel').classList.add('visible');
+
+      // Hero
+      document.getElementById('clientName').textContent    = c.business_name;
+      document.getElementById('clientType').textContent    = capitalize(c.business_type);
+      document.getElementById('clientPkg').textContent     = capitalize(c.package);
+
+      // Status badge
+      const badge = document.getElementById('statusBadge');
+      badge.className = `badge ${statusBadgeClass(c.status)}`;
+      badge.innerHTML = `<span class="badge-dot"></span>${c.status.replace('_', ' ')}`;
+
+      // Brand color chip
+      if (c.brand_color) {
+        document.getElementById('colorSwatch').style.background = c.brand_color;
+        document.getElementById('clientColor').textContent      = c.brand_color.toUpperCase();
+        document.getElementById('colorChip').style.display      = 'inline-flex';
+      }
+
+      // Details
+      document.getElementById('clientOwner').textContent = c.owner_name  || '—';
+      document.getElementById('clientEmail').textContent = c.owner_email || '—';
+
+      const phoneEl = document.getElementById('clientPhone');
+      const phoneRow = document.getElementById('phoneRow');
+      if (c.owner_phone) { phoneEl.textContent = c.owner_phone; }
+      else { phoneRow.style.display = 'none'; }
+
+      if (c.preview_url || c.live_url) {
+        const url = c.live_url || c.preview_url;
+        const link = document.getElementById('previewLink');
+        link.href        = url;
+        link.textContent = url;
+        document.getElementById('previewRow').style.display = '';
+      }
+
+      if (c.github_branch) {
+        document.getElementById('clientBranch').textContent    = c.github_branch;
+        document.getElementById('branchRow').style.display     = '';
+      }
+
+      // Show any agent notes (audit_notes or qa_notes)
+      const notes = c.review_notes || c.audit_notes || c.qa_notes;
+      if (notes) {
+        const label = c.review_notes ? 'Review Notes' : c.audit_notes ? 'Audit Notes' : 'QA Notes';
+        document.getElementById('notesLabel').textContent = label;
+        document.getElementById('notesBody').textContent  = notes;
+        document.getElementById('notesWrap').style.display = '';
+      }
+
+      // If already delivered or otherwise terminal, show info banner + hide action buttons
+      const actionable = ['ready', 'new', 'building', 'auditing', 'qa', 'needs_repair'];
+      if (!actionable.includes(c.status)) {
+        document.getElementById('primaryButtons').style.display = 'none';
+        const banner = document.getElementById('actionedBanner');
+        banner.textContent = `This client is already marked as "${c.status}" — no further action needed here.`;
+        banner.classList.add('visible');
+      }
+    }
+
+    // ── Approve ─────────────────────────────────────────────────────────────
+    document.getElementById('btnApprove').addEventListener('click', async () => {
+      if (isSubmitting) return;
+      isSubmitting = true;
+      setButtons(true);
+
+      const { error } = await db
+        .from('clients')
+        .update({ status: 'delivered', review_notes: null })
+        .eq('id', clientId);
+
+      isSubmitting = false;
+      setButtons(false);
+
+      if (error) {
+        showResult('error', 'Failed to update status: ' + error.message);
+      } else {
+        showResult('success', `✓ "${currentClient.business_name}" has been approved and marked as delivered.`);
+        document.getElementById('primaryButtons').style.display = 'none';
+        // Update badge in place
+        const badge = document.getElementById('statusBadge');
+        badge.className = 'badge badge-delivered';
+        badge.innerHTML = '<span class="badge-dot"></span>delivered';
+      }
+    });
+
+    // ── Send back ────────────────────────────────────────────────────────────
+    document.getElementById('btnSendback').addEventListener('click', () => {
+      document.getElementById('primaryButtons').style.display   = 'none';
+      document.getElementById('sendbackForm').classList.add('visible');
+      document.getElementById('reviewNotes').focus();
+    });
+
+    document.getElementById('btnCancel').addEventListener('click', () => {
+      document.getElementById('sendbackForm').classList.remove('visible');
+      document.getElementById('primaryButtons').style.display = '';
+      document.getElementById('reviewNotes').value = '';
+    });
+
+    document.getElementById('btnConfirmSendback').addEventListener('click', async () => {
+      if (isSubmitting) return;
+      const notes = document.getElementById('reviewNotes').value.trim();
+      if (!notes) {
+        document.getElementById('reviewNotes').focus();
+        document.getElementById('reviewNotes').style.borderColor = 'var(--accent)';
+        return;
+      }
+      document.getElementById('reviewNotes').style.borderColor = '';
+
+      isSubmitting = true;
+      document.getElementById('btnConfirmSendback').disabled = true;
+      document.getElementById('btnCancel').disabled = true;
+
+      const { error } = await db
+        .from('clients')
+        .update({ status: 'building', review_notes: notes })
+        .eq('id', clientId);
+
+      isSubmitting = false;
+      document.getElementById('btnConfirmSendback').disabled = false;
+      document.getElementById('btnCancel').disabled = false;
+
+      if (error) {
+        showResult('error', 'Failed to update status: ' + error.message);
+      } else {
+        document.getElementById('sendbackForm').classList.remove('visible');
+        showResult('success', `↩ Sent back to builder with your notes. Status updated to "building".`);
+        const badge = document.getElementById('statusBadge');
+        badge.className = 'badge badge-building';
+        badge.innerHTML = '<span class="badge-dot"></span>building';
+        document.getElementById('notesWrap').style.display = '';
+        document.getElementById('notesLabel').textContent  = 'Review Notes';
+        document.getElementById('notesBody').textContent   = notes;
+      }
+    });
+
+    // ── Utilities ────────────────────────────────────────────────────────────
+    function setButtons(disabled) {
+      document.getElementById('btnApprove').disabled  = disabled;
+      document.getElementById('btnSendback').disabled = disabled;
+    }
+
+    function showResult(type, msg) {
+      const el = document.getElementById('resultMsg');
+      el.textContent = msg;
+      el.className   = `result-msg ${type}`;
+    }
+
+    // ── Boot ─────────────────────────────────────────────────────────────────
+    loadClient();
+  </script>
+</body>
+</html>
