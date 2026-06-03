@@ -1,10 +1,15 @@
 {
   "version": 2,
-  "outputDirectory": "admin",
-  "buildCommand": null,
-  "framework": null,
+  "builds": [
+    {
+      "src": "admin/**",
+      "use": "@vercel/static"
+    }
+  ],
   "routes": [
-    { "src": "/review", "dest": "/review.html" },
-    { "src": "/(.*)", "dest": "/$1" }
+    {
+      "src": "/(.*)",
+      "dest": "/admin/$1"
+    }
   ]
 }
