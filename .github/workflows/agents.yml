@@ -21,7 +21,7 @@
 # GitHub Secrets required (Settings → Secrets → Actions):
 #   SUPABASE_URL, SUPABASE_ANON_KEY, ANTHROPIC_API_KEY,
 #   RESEND_API_KEY, GH_PAT (Personal Access Token — needed for
-#   cross-repo operations in builder/auditor), GITHUB_OWNER, GITHUB_REPO
+#   cross-repo operations in builder/auditor), GH_OWNER, GH_REPO
 
 name: MoeBuilds Agent Pipeline
 
@@ -59,8 +59,8 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN:      ${{ secrets.GH_PAT }}
-          GITHUB_OWNER:      ${{ secrets.GITHUB_OWNER }}
-          GITHUB_REPO:       ${{ secrets.GITHUB_REPO }}
+          GH_OWNER:          ${{ secrets.GH_OWNER }}
+          GH_REPO:           ${{ secrets.GH_REPO }}
         run: node agents/builder.js ${{ github.event.client_payload.client_id }}
 
 # ── Auditor ───────────────────────────────────────────────────────────────────
@@ -89,8 +89,8 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN:      ${{ secrets.GH_PAT }}
-          GITHUB_OWNER:      ${{ secrets.GITHUB_OWNER }}
-          GITHUB_REPO:       ${{ secrets.GITHUB_REPO }}
+          GH_OWNER:          ${{ secrets.GH_OWNER }}
+          GH_REPO:           ${{ secrets.GH_REPO }}
         run: node agents/auditor.js
 
 # ── QA ────────────────────────────────────────────────────────────────────────
@@ -122,8 +122,8 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           RESEND_API_KEY:    ${{ secrets.RESEND_API_KEY }}
           GITHUB_TOKEN:      ${{ secrets.GH_PAT }}
-          GITHUB_OWNER:      ${{ secrets.GITHUB_OWNER }}
-          GITHUB_REPO:       ${{ secrets.GITHUB_REPO }}
+          GH_OWNER:          ${{ secrets.GH_OWNER }}
+          GH_REPO:           ${{ secrets.GH_REPO }}
         run: node agents/qa.js
 
 # ── Security ──────────────────────────────────────────────────────────────────
