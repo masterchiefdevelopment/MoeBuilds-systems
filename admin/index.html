@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moe Builds Co. — Client Intake</title>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0a;
+      --surface:   #141414;
+      --surface-2: #1c1c1c;
+      --border:    #262626;
+      --border-focus: #e03030;
+      --accent:    #e03030;
+      --accent-hover: #c42828;
+      --text:      #f2f2f2;
+      --text-muted: #737373;
+      --text-label: #a3a3a3;
+      --success-bg: #0d1f13;
+      --success-border: #166534;
+      --success-text: #4ade80;
+      --error-bg:   #1f0d0d;
+      --error-border: #991b1b;
+      --error-text: #f87171;
+      --radius:    10px;
+      --radius-sm: 6px;
+    }
+
+    html, body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 48px 16px 80px;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────── */
+    .header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .logo-mark {
+      width: 36px;
+      height: 36px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 18px;
+      color: #fff;
+      letter-spacing: -1px;
+      flex-shrink: 0;
+    }
+
+    .logo-name {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+
+    .header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .header p {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    /* ── Card ─────────────────────────────────────────────────────── */
+    .card {
+      width: 100%;
+      max-width: 560px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 36px 40px;
+    }
+
+    /* ── Section labels ───────────────────────────────────────────── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Field groups ─────────────────────────────────────────────── */
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    /* ── Individual field ─────────────────────────────────────────── */
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-label);
+    }
+
+    label span.required {
+      color: var(--accent);
+      margin-left: 2px;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    select {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 14px;
+      padding: 10px 13px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    input[type="text"]:focus,
+    input[type="email"]:focus,
+    input[type="tel"]:focus,
+    select:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(224, 48, 48, 0.12);
+    }
+
+    input::placeholder { color: var(--text-muted); }
+
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23737373' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px;
+      cursor: pointer;
+    }
+
+    select option { background: #1c1c1c; color: var(--text); }
+
+    /* ── Color picker ─────────────────────────────────────────────── */
+    .color-field {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 13px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      cursor: pointer;
+    }
+
+    .color-field:focus-within {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(224, 48, 48, 0.12);
+    }
+
+    input[type="color"] {
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 4px;
+      padding: 0;
+      cursor: pointer;
+      background: none;
+      flex-shrink: 0;
+    }
+
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"]::-webkit-color-swatch {
+      border: none;
+      border-radius: 4px;
+    }
+
+    .color-hex {
+      font-size: 13px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      color: var(--text);
+      letter-spacing: 0.5px;
+      user-select: none;
+    }
+
+    .color-preview-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    /* ── Submit button ────────────────────────────────────────────── */
+    .btn-submit {
+      width: 100%;
+      padding: 13px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s, opacity 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      letter-spacing: 0.1px;
+    }
+
+    .btn-submit:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-submit:active:not(:disabled) { transform: scale(0.99); }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    .btn-submit.loading .spinner { display: block; }
+    .btn-submit.loading .btn-label { opacity: 0.7; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Messages ─────────────────────────────────────────────────── */
+    .message {
+      display: none;
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-top: 16px;
+    }
+
+    .message.success {
+      display: block;
+      background: var(--success-bg);
+      border: 1px solid var(--success-border);
+      color: var(--success-text);
+    }
+
+    .message.error {
+      display: block;
+      background: var(--error-bg);
+      border: 1px solid var(--error-border);
+      color: var(--error-text);
+    }
+
+    .client-id {
+      display: inline-block;
+      background: rgba(74, 222, 128, 0.08);
+      border: 1px solid var(--success-border);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      color: var(--success-text);
+      margin-top: 6px;
+      word-break: break-all;
+    }
+
+    /* ── Success state (replaces form) ───────────────────────────── */
+    .success-state {
+      display: none;
+      text-align: center;
+      padding: 16px 0;
+    }
+
+    .success-state.visible { display: block; }
+    .success-state .check-icon {
+      width: 52px;
+      height: 52px;
+      background: rgba(74, 222, 128, 0.1);
+      border: 2px solid var(--success-border);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 18px;
+      font-size: 22px;
+    }
+
+    .success-state h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .success-state p {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+
+    .success-state .client-id-block {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      margin: 20px 0;
+      text-align: left;
+    }
+
+    .success-state .client-id-block .id-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .success-state .client-id-block .id-value {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      color: var(--success-text);
+      word-break: break-all;
+    }
+
+    .success-state .client-name {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .btn-new {
+      margin-top: 4px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: var(--radius-sm);
+      padding: 10px 20px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .btn-new:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ── Field error highlight ────────────────────────────────────── */
+    .field.invalid input,
+    .field.invalid select {
+      border-color: var(--accent);
+    }
+
+    .field .error-hint {
+      font-size: 12px;
+      color: var(--accent);
+      display: none;
+    }
+
+    .field.invalid .error-hint { display: block; }
+
+    /* ── Responsive ───────────────────────────────────────────────── */
+    @media (max-width: 520px) {
+      body { padding: 28px 12px 60px; }
+      .card { padding: 24px 20px; }
+      .field-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo">
+      <div class="logo-mark">M</div>
+      <span class="logo-name">Moe Builds Co.</span>
+    </div>
+    <h1>Client Intake</h1>
+    <p>Fill out the form below to create a new client record</p>
+  </div>
+
+  <div class="card">
+
+    <!-- ── Success state ───────────────────────────────────────── -->
+    <div class="success-state" id="successState">
+      <div class="check-icon">✓</div>
+      <h2>Client Created</h2>
+      <p>Record saved for <span class="client-name" id="successName"></span></p>
+      <div class="client-id-block">
+        <div class="id-label">Client ID</div>
+        <div class="id-value" id="successId"></div>
+      </div>
+      <p style="font-size:13px;color:var(--text-muted)">
+        The builder agent will pick this up when you're ready to run it.
+      </p>
+      <br/>
+      <button class="btn-new" onclick="resetForm()">+ Add Another Client</button>
+    </div>
+
+    <!-- ── Form ─────────────────────────────────────────────────── -->
+    <form id="intakeForm" novalidate>
+
+      <!-- Business info -->
+      <div class="section-label">Business Info</div>
+      <div class="field-group">
+
+        <div class="field" id="field-business_name">
+          <label for="business_name">Business Name <span class="required">*</span></label>
+          <input type="text" id="business_name" name="business_name"
+                 placeholder="e.g. King Cuts Barbershop" autocomplete="organization" />
+          <span class="error-hint">Business name is required</span>
+        </div>
+
+        <div class="field-row">
+          <div class="field" id="field-business_type">
+            <label for="business_type">Business Type <span class="required">*</span></label>
+            <select id="business_type" name="business_type">
+              <option value="" disabled selected>Select type</option>
+              <option value="barbershop">Barbershop</option>
+              <option value="foodtruck">Food Truck</option>
+              <option value="carwash">Car Wash</option>
+            </select>
+            <span class="error-hint">Select a business type</span>
+          </div>
+
+          <div class="field" id="field-package">
+            <label for="package">Package <span class="required">*</span></label>
+            <select id="package" name="package">
+              <option value="" disabled selected>Select package</option>
+              <option value="starter">Starter</option>
+              <option value="standard">Standard</option>
+              <option value="premium">Premium</option>
+            </select>
+            <span class="error-hint">Select a package</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="brand_color">Brand Color <span class="required">*</span></label>
+          <div class="color-field" onclick="document.getElementById('brand_color').click()">
+            <input type="color" id="brand_color" name="brand_color" value="#e03030" />
+            <span class="color-hex" id="colorHex">#e03030</span>
+            <span class="color-preview-label">Click to change</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Owner info -->
+      <div class="section-label">Owner Info</div>
+      <div class="field-group">
+
+        <div class="field" id="field-owner_name">
+          <label for="owner_name">Owner Name <span class="required">*</span></label>
+          <input type="text" id="owner_name" name="owner_name"
+                 placeholder="Full name" autocomplete="name" />
+          <span class="error-hint">Owner name is required</span>
+        </div>
+
+        <div class="field-row">
+          <div class="field" id="field-owner_email">
+            <label for="owner_email">Email <span class="required">*</span></label>
+            <input type="email" id="owner_email" name="owner_email"
+                   placeholder="owner@example.com" autocomplete="email" />
+            <span class="error-hint">Valid email is required</span>
+          </div>
+
+          <div class="field" id="field-owner_phone">
+            <label for="owner_phone">Phone</label>
+            <input type="tel" id="owner_phone" name="owner_phone"
+                   placeholder="(555) 000-0000" autocomplete="tel" />
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Submit -->
+      <button type="submit" class="btn-submit" id="submitBtn">
+        <div class="spinner"></div>
+        <span class="btn-label">Create Client Record</span>
+      </button>
+
+      <div class="message error" id="errorMsg"></div>
+
+    </form>
+  </div>
+
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // ── Supabase config ──────────────────────────────────────────────────────
+    // Replace these with your actual project values from supabase.com → Settings → API
+    const SUPABASE_URL      = 'YOUR_SUPABASE_URL';
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ── Color picker sync ────────────────────────────────────────────────────
+    const colorInput = document.getElementById('brand_color');
+    const colorHex   = document.getElementById('colorHex');
+
+    colorInput.addEventListener('input', () => {
+      colorHex.textContent = colorInput.value.toUpperCase();
+    });
+
+    // ── Validation helpers ───────────────────────────────────────────────────
+    function setValid(fieldId)   {
+      document.getElementById('field-' + fieldId)?.classList.remove('invalid');
+    }
+
+    function setInvalid(fieldId) {
+      document.getElementById('field-' + fieldId)?.classList.add('invalid');
+    }
+
+    function validateForm(data) {
+      let valid = true;
+
+      const requiredText = ['business_name', 'owner_name'];
+      requiredText.forEach(id => {
+        if (!data[id]?.trim()) { setInvalid(id); valid = false; }
+        else setValid(id);
+      });
+
+      const requiredSelect = ['business_type', 'package'];
+      requiredSelect.forEach(id => {
+        if (!data[id]) { setInvalid(id); valid = false; }
+        else setValid(id);
+      });
+
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.owner_email || '');
+      if (!emailOk) { setInvalid('owner_email'); valid = false; }
+      else setValid('owner_email');
+
+      return valid;
+    }
+
+    // ── Form submit ──────────────────────────────────────────────────────────
+    document.getElementById('intakeForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const form = e.target;
+      const btn  = document.getElementById('submitBtn');
+      const errMsg = document.getElementById('errorMsg');
+
+      errMsg.className = 'message';   // hide previous error
+
+      const data = {
+        business_name: form.business_name.value.trim(),
+        business_type: form.business_type.value,
+        package:       form.package.value,
+        brand_color:   form.brand_color.value.toUpperCase(),
+        owner_name:    form.owner_name.value.trim(),
+        owner_email:   form.owner_email.value.trim().toLowerCase(),
+        owner_phone:   form.owner_phone.value.trim() || null,
+        status:        'new',
+      };
+
+      if (!validateForm(data)) return;
+
+      // Loading state
+      btn.disabled = true;
+      btn.classList.add('loading');
+      btn.querySelector('.btn-label').textContent = 'Saving…';
+
+      try {
+        const { data: inserted, error } = await db
+          .from('clients')
+          .insert(data)
+          .select('id, business_name')
+          .single();
+
+        if (error) throw error;
+
+        // Show success state
+        document.getElementById('intakeForm').style.display  = 'none';
+        document.getElementById('successName').textContent   = inserted.business_name;
+        document.getElementById('successId').textContent     = inserted.id;
+        document.getElementById('successState').classList.add('visible');
+
+      } catch (err) {
+        errMsg.textContent  = 'Error: ' + (err.message || 'Something went wrong. Check your Supabase config.');
+        errMsg.className    = 'message error';
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+        btn.querySelector('.btn-label').textContent = 'Create Client Record';
+      }
+    });
+
+    // ── Reset / new client ───────────────────────────────────────────────────
+    function resetForm() {
+      const form = document.getElementById('intakeForm');
+      form.reset();
+      colorHex.textContent = '#E03030';
+      colorInput.value     = '#e03030';
+      document.getElementById('successState').classList.remove('visible');
+      document.getElementById('errorMsg').className = 'message';
+      form.style.display = '';
+    }
+  </script>
+</body>
+</html>
