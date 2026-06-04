@@ -1,3 +1,4 @@
+// Production ready - v1.0
 // Builder Agent - reads client intake and builds the app
 console.log('[BUILDER] Script loaded');
 
