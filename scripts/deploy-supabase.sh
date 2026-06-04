@@ -13,7 +13,7 @@
 set -euo pipefail
 
 PROJECT_REF="ulzijveryrnfthschghw"
-FUNCTIONS=(trigger-builder trigger-auditor trigger-qa)
+FUNCTIONS=(trigger-builder trigger-auditor trigger-qa trigger-pipeline)
 SQL_ONLY=false
 FNS_ONLY=false
 

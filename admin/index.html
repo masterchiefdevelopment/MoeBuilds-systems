@@ -435,7 +435,7 @@
         <div class="id-value" id="successId"></div>
       </div>
       <p style="font-size:13px;color:var(--text-muted)">
-        The builder agent will pick this up when you're ready to run it.
+        Build pipeline triggered — the builder agent is starting now.
       </p>
       <br/>
       <button class="btn-new" onclick="resetForm()">+ Add Another Client</button>
@@ -614,6 +614,13 @@
           .single();
 
         if (error) throw error;
+
+        // Trigger the pipeline poller immediately (fire-and-forget).
+        // GITHUB_PAT stays server-side inside the edge function — never in the browser.
+        fetch(`${SUPABASE_URL}/functions/v1/trigger-pipeline`, {
+          method:  'POST',
+          headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+        }).catch(err => console.warn('[trigger-pipeline] Could not trigger pipeline:', err.message));
 
         // Show success state
         document.getElementById('intakeForm').style.display  = 'none';
