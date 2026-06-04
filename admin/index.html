@@ -616,11 +616,9 @@
         if (error) throw error;
 
         // Trigger the pipeline poller immediately (fire-and-forget).
-        // GITHUB_PAT stays server-side inside the edge function — never in the browser.
-        fetch(`${SUPABASE_URL}/functions/v1/trigger-pipeline`, {
-          method:  'POST',
-          headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-        }).catch(err => console.warn('[trigger-pipeline] Could not trigger pipeline:', err.message));
+        // GITHUB_PAT is read server-side in the Vercel function — never in the browser.
+        fetch('/api/trigger-pipeline', { method: 'POST' })
+          .catch(err => console.warn('[trigger-pipeline] Could not trigger pipeline:', err.message));
 
         // Show success state
         document.getElementById('intakeForm').style.display  = 'none';
