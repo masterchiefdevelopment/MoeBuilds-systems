@@ -33,16 +33,18 @@ on:
         description: 'Client ID to build'
         required: false
         default: ''
+      run_poller:
+        description: 'Run full pipeline poller (yes/no)'
+        required: false
+        default: 'no'
 
-# ── Poller ────────────────────────────────────────────────────────────────────
-# Runs every 10 minutes.  Queries Supabase REST API for the oldest client in
-# each pipeline stage and runs the responsible agent.  All three stage checks
-# happen in one run — a failure in one agent does not block the others.
 jobs:
   poller:
     name: Poller
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' && github.event.schedule == '*/10 * * * *'
+    if: |
+      (github.event_name == 'schedule' && github.event.schedule == '*/10 * * * *') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.run_poller == 'yes')
     env:
       SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -85,7 +87,6 @@ jobs:
               echo "id=${CLIENT_ID}" >> "$GITHUB_OUTPUT"
             else
               echo "⚠  PATCH returned HTTP ${HTTP} — cannot claim client."
-              echo "   RLS may be blocking UPDATE. See README → Supabase RLS Policies."
               echo "id=" >> "$GITHUB_OUTPUT"
             fi
           else
@@ -169,13 +170,10 @@ jobs:
         run: node agents/qa.js
 
 # ── Manual Build ──────────────────────────────────────────────────────────────
-# Triggered by the dashboard "Build Now" button (via trigger-builder edge fn)
-# or directly from GitHub Actions → Run workflow.
-# Builds the specific client identified by client_id.
   manual_build:
     name: Manual Build
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.client_id != ''
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -198,12 +196,7 @@ jobs:
           GH_OWNER:          ${{ secrets.GH_OWNER }}
           GH_REPO:           ${{ secrets.GH_REPO }}
           CLIENT_ID:         ${{ github.event.inputs.client_id }}
-        run: |
-          if [[ -z "$CLIENT_ID" ]]; then
-            echo "No client_id provided — nothing to do."
-            exit 0
-          fi
-          node agents/builder.js
+        run: node agents/builder.js
 
 # ── Security ──────────────────────────────────────────────────────────────────
   security:
