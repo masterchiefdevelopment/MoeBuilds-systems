@@ -4,7 +4,6 @@ console.log('[BUILDER] Script loaded');
 require('dotenv/config');
 const { createClient } = require('@supabase/supabase-js');
 const { Anthropic }    = require('@anthropic-ai/sdk');
-// Node 18+ has fetch built-in — no node-fetch needed
 
 // ─── GitHub target repo ────────────────────────────────────────────────────
 const GITHUB_API   = 'https://api.github.com';
@@ -47,11 +46,13 @@ async function githubFetch(path, method = 'GET', body = null) {
     const err = await res.text();
     throw new Error(`GitHub ${method} ${path} → ${res.status}: ${err}`);
   }
+
+  // DELETE returns 204 with no body
+  if (res.status === 204) return null;
   return res.json();
 }
 
 // ─── Template builder ──────────────────────────────────────────────────────
-// Sections available per business type × package tier
 const SECTIONS = {
   barbershop: {
     starter:  ['Hero', 'About', 'Services', 'Contact'],
@@ -130,7 +131,6 @@ function selectTemplate(businessType, pkg) {
 
   const sectionHtml = sections.map(s => buildSectionHtml(s, businessType)).join('\n');
 
-  // Shared CSS; business-type-specific card styles injected inline
   const cardCss = businessType === 'barbershop'
     ? '.card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1rem; margin-top:1rem; } .card { border:2px solid var(--brand); border-radius:8px; padding:1rem; text-align:center; font-weight:600; }'
     : '.card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin-top:1rem; } .card { border-left:4px solid var(--brand); padding:.75rem 1rem; background:#f9f9f9; font-weight:600; }';
@@ -203,7 +203,6 @@ Return ONLY the JSON object. No markdown, no extra text.`,
   try {
     return JSON.parse(raw);
   } catch {
-    // Strip any accidental markdown fences Claude might have added
     const cleaned = raw.replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
     return JSON.parse(cleaned);
   }
@@ -211,7 +210,7 @@ Return ONLY the JSON object. No markdown, no extra text.`,
 
 // ─── Apply content + branding to template ─────────────────────────────────
 function applyContent(html, client, content) {
-  const { business_name, brand_color, business_type } = client;
+  const { business_name, brand_color } = client;
 
   const servicesHtml = (content.services || [])
     .map(s => `<div class="card">${s}</div>`)
@@ -247,12 +246,30 @@ async function createBranchAndPush(branchName, files, commitMessage) {
   const commitData  = await githubFetch(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/git/commits/${mainSha}`);
   const baseTreeSha = commitData.tree.sha;
 
-  // Create branch pointing at main
+  // Create branch — delete first if it already exists
   log('GITHUB', `Creating branch "${branchName}"`);
-  await githubFetch(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/git/refs`, 'POST', {
-    ref: `refs/heads/${branchName}`,
-    sha: mainSha,
-  });
+  try {
+    await githubFetch(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/git/refs`, 'POST', {
+      ref: `refs/heads/${branchName}`,
+      sha: mainSha,
+    });
+    log('GITHUB', `Branch created`);
+  } catch (e) {
+    if (e.message.includes('422')) {
+      log('GITHUB', `Branch already exists — deleting and recreating`);
+      await githubFetch(
+        `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/git/refs/heads/${branchName}`,
+        'DELETE'
+      );
+      await githubFetch(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/git/refs`, 'POST', {
+        ref: `refs/heads/${branchName}`,
+        sha: mainSha,
+      });
+      log('GITHUB', `Branch recreated`);
+    } else {
+      throw e;
+    }
+  }
 
   // Upload file blobs
   log('GITHUB', `Uploading ${files.length} file(s) as blobs`);
@@ -294,8 +311,6 @@ async function createBranchAndPush(branchName, files, commitMessage) {
 async function main() {
   const TEST_MODE = process.argv.includes('--test');
 
-  // Step 1: Validate CLI arguments
-  // slice(2) skips argv[0] (node binary) and argv[1] (script path).
   const clientId = process.env.CLIENT_ID || process.argv.slice(2).find(a => !a.startsWith('-'));
   if (!TEST_MODE && !clientId) {
     console.error('Usage: node agents/builder.js <client_id>');
@@ -303,8 +318,6 @@ async function main() {
     process.exit(1);
   }
 
-  // In test mode, skip Supabase + GitHub checks.
-  // ANTHROPIC_API_KEY or ANTHROPIC_BASE_URL (proxy) is sufficient for Claude calls.
   const required = TEST_MODE
     ? []
     : ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'ANTHROPIC_API_KEY', 'GITHUB_TOKEN'];
@@ -314,13 +327,11 @@ async function main() {
     process.exit(1);
   }
 
-  // ANTHROPIC_BASE_URL is set in Claude Code environments — the proxy handles auth.
-  // Fall back to a placeholder so the SDK constructs without throwing.
   const anthropic = new Anthropic({
     apiKey:  process.env.ANTHROPIC_API_KEY || 'placeholder',
     baseURL: process.env.ANTHROPIC_BASE_URL,
   });
-  const supabase  = TEST_MODE
+  const supabase = TEST_MODE
     ? null
     : createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
@@ -329,7 +340,6 @@ async function main() {
   }
   log('START', `Builder Agent initializing — ${TEST_MODE ? 'test run' : `client_id: ${clientId}`}`);
 
-  // Step 2: Load client record (real Supabase fetch or test fixture)
   let client;
   if (TEST_MODE) {
     client = TEST_CLIENT;
@@ -349,7 +359,6 @@ async function main() {
     log('SUPABASE', `Client: "${client.business_name}" | type: ${client.business_type} | pkg: ${client.package}`);
   }
 
-  // Step 3: Set status → 'building'
   if (TEST_MODE) {
     log('TEST', `[SKIPPED] Would set status → 'building' for id=${client.id}`);
   } else {
@@ -361,28 +370,22 @@ async function main() {
     if (buildingErr) throw new Error(`Status update failed: ${buildingErr.message}`);
   }
 
-  // Step 4: Select template based on business_type × package
   log('TEMPLATE', `Loading template for ${client.business_type}/${client.package}`);
   const templateHtml = selectTemplate(client.business_type, client.package);
   log('TEMPLATE', 'Template loaded');
 
-  // Step 5: Generate customized content via Claude (runs in both modes)
   const content = await generateContent(client, anthropic);
   log('CLAUDE', `Headline: "${content.hero_headline}"`);
 
-  // Step 6: Inject client content + branding into template
   log('TEMPLATE', 'Injecting content and brand color into template');
   const finalHtml = applyContent(templateHtml, client, content);
 
-  // Step 7: Determine branch name
   const slug       = slugify(client.business_name);
   const branchName = `client/${slug}`;
 
-  // Step 8: Create branch and push files to GitHub (skipped in test mode)
   const files = [
     { path: 'index.html', content: finalHtml },
     {
-      // Metadata snapshot so the Auditor agent can read build context
       path:    'site.json',
       content: JSON.stringify({
         client_id:     client.id,
@@ -401,12 +404,10 @@ async function main() {
     log('TEST', `[SKIPPED] Would push ${files.length} file(s): ${files.map(f => f.path).join(', ')}`);
     log('TEST', `[SKIPPED] Would set status → 'auditing' and store github_branch="${branchName}"`);
 
-    // Write the generated HTML to disk so it can be inspected locally
     const { writeFileSync } = require('fs');
     const outPath = 'test-output.html';
     writeFileSync(outPath, finalHtml, 'utf-8');
     log('TEST', `Generated HTML written to ${outPath} — open in a browser to preview`);
-
     log('DONE', `Test run complete. Claude API is working. Hero: "${content.hero_headline}"`);
   } else {
     const commitSha = await createBranchAndPush(
@@ -416,7 +417,6 @@ async function main() {
     );
     log('GITHUB', `Branch ready — commit ${commitSha.slice(0, 7)}`);
 
-    // Step 9: Set status → 'auditing' and record the branch
     log('SUPABASE', `Updating status → 'auditing'`);
     const { error: auditingErr } = await supabase
       .from('clients')
