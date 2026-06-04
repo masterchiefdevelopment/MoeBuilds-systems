@@ -302,6 +302,21 @@
     .btn-approve:hover:not(:disabled) { background: rgba(34,197,94,.22); }
     .btn-approve:disabled { opacity: 0.5; cursor: not-allowed; }
 
+    .btn-build-now {
+      background: rgba(234,179,8,.12);
+      border: 1px solid rgba(234,179,8,.3);
+      color: #fbbf24;
+      border-radius: 5px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-build-now:hover:not(:disabled) { background: rgba(234,179,8,.22); }
+    .btn-build-now:disabled { opacity: 0.5; cursor: not-allowed; }
+
     .btn-review {
       display: inline-flex;
       align-items: center;
@@ -578,6 +593,10 @@
           ? `<button class="btn-approve" onclick="approveClient('${c.id}', this)">Approve</button>`
           : '';
 
+        const buildNowPart = c.status === 'new'
+          ? `<button class="btn-build-now" onclick="buildNow('${c.id}', this)">Build Now</button>`
+          : '';
+
         return `
           <div class="build-card">
             <div class="build-top">
@@ -593,6 +612,7 @@
             <div class="build-footer">
               ${urlPart}
               <div class="build-actions">
+                ${buildNowPart}
                 ${approvePart}
                 <a href="/review.html?client_id=${c.id}" class="btn-review">Review</a>
               </div>
@@ -625,6 +645,40 @@
             </div>
           </div>`;
       }).join('');
+    }
+
+    // ── Build Now ─────────────────────────────────────────────────────────
+    async function buildNow(id, btn) {
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/functions/v1/trigger-builder`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':  'application/json',
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({
+              type: 'INSERT', table: 'clients', schema: 'public',
+              record: { id, status: 'new' },
+            }),
+          }
+        );
+        if (res.ok) {
+          btn.textContent = 'Queued ✓';
+          setTimeout(refresh, 3000);
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'Build Now';
+          alert('Error: ' + await res.text());
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Build Now';
+        alert('Error: ' + err.message);
+      }
     }
 
     // ── Approve ───────────────────────────────────────────────────────────

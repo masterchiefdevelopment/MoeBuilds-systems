@@ -2,44 +2,180 @@
 #
 # Trigger architecture
 # ────────────────────
-# Pipeline jobs (builder / auditor / qa) are triggered via GitHub's
-# workflow_dispatch API, which Supabase Edge Functions call whenever a row
-# changes status.  Schedule jobs (security / analyst) fire on cron.
+# A "poller" job runs every 10 minutes and queries Supabase REST API directly.
+# If it finds a client queued in any pipeline stage it claims the row and runs
+# the appropriate agent.  No webhooks, no edge-function dependencies.
+#
+# A "manual_build" job fires on workflow_dispatch so you can build a specific
+# client immediately from the dashboard "Build Now" button.
+#
+# Security and Analyst run on their own independent cron schedules.
 #
 # GitHub Secrets required (Settings → Secrets → Actions):
-#   SUPABASE_URL       — Supabase project URL
+#   SUPABASE_URL       — https://ulzijveryrnfthschghw.supabase.co
 #   SUPABASE_ANON_KEY  — Supabase anon/public key
-#   ANTHROPIC_API_KEY  — Anthropic API key (builder / auditor / analyst)
-#   RESEND_API_KEY     — Resend API key (qa / security / analyst)
-#   GH_PAT             — GitHub Personal Access Token (cross-repo access)
-#   GH_OWNER           — Target repo owner  (e.g. masterchiefdevelopment)
-#   GH_REPO            — Target repo name   (e.g. moe-builds-co)
+#   ANTHROPIC_API_KEY  — Anthropic API key
+#   RESEND_API_KEY     — Resend API key
+#   GH_PAT             — GitHub PAT (repo + workflow scopes)
+#   GH_OWNER           — Target repo owner  (masterchiefdevelopment)
+#   GH_REPO            — Target repo name   (moe-builds-co)
 
 name: MoeBuilds Agent Pipeline
 
 on:
+  schedule:
+    - cron: '*/10 * * * *'   # poller    — every 10 minutes
+    - cron: '0 0 * * *'      # security  — daily midnight UTC
+    - cron: '0 8 * * 1'      # analyst   — every Monday 08:00 UTC
   workflow_dispatch:
     inputs:
       client_id:
-        description: 'Client ID to process'
+        description: 'Client ID to build'
         required: false
         default: ''
-      action:
-        description: 'Action to run: build | audit | qa'
-        required: true
-        default: 'build'
-  schedule:
-    - cron: '0 0 * * *'   # security — daily at midnight UTC
-    - cron: '0 8 * * 1'   # analyst  — every Monday at 08:00 UTC
 
-# ── Builder ──────────────────────────────────────────────────────────────────
-# Triggered by the trigger-builder Supabase Edge Function when a client row
-# is inserted with status = 'new'.  Requires inputs.client_id.
+# ── Poller ────────────────────────────────────────────────────────────────────
+# Runs every 10 minutes.  Queries Supabase REST API for the oldest client in
+# each pipeline stage and runs the responsible agent.  All three stage checks
+# happen in one run — a failure in one agent does not block the others.
 jobs:
-  builder:
-    name: Builder Agent
+  poller:
+    name: Poller
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'build'
+    if: github.event_name == 'schedule' && github.event.schedule == '*/10 * * * *'
+    env:
+      SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Stage A: status='new' → Builder ──────────────────────────────────
+      - name: Poll — new client
+        id: poll_new
+        run: |
+          RESPONSE=$(curl -s \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            "${SUPABASE_URL}/rest/v1/clients?status=eq.new&order=created_at.asc&limit=1")
+
+          CLIENT_ID=$(echo "$RESPONSE" | jq -r '.[0].id // empty' 2>/dev/null || true)
+
+          if [[ -n "$CLIENT_ID" ]]; then
+            echo "Found new client: $CLIENT_ID — claiming..."
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X PATCH \
+              -H "apikey: ${SUPABASE_ANON_KEY}" \
+              -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+              -H "Content-Type: application/json" \
+              -H "Prefer: return=minimal" \
+              -d '{"status":"building"}' \
+              "${SUPABASE_URL}/rest/v1/clients?id=eq.${CLIENT_ID}")
+            if [[ "$HTTP" == "204" || "$HTTP" == "200" ]]; then
+              echo "Claimed (status → building)"
+              echo "id=${CLIENT_ID}" >> "$GITHUB_OUTPUT"
+            else
+              echo "⚠  PATCH returned HTTP ${HTTP} — cannot claim client."
+              echo "   RLS may be blocking UPDATE. See README → Supabase RLS Policies."
+              echo "id=" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "No new clients."
+            echo "id=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Builder Agent
+        if: steps.poll_new.outputs.id != ''
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN:      ${{ secrets.GH_PAT }}
+          GH_OWNER:          ${{ secrets.GH_OWNER }}
+          GH_REPO:           ${{ secrets.GH_REPO }}
+          CLIENT_ID:         ${{ steps.poll_new.outputs.id }}
+        run: node agents/builder.js
+
+      # ── Stage B: status='auditing' → Auditor ─────────────────────────────
+      - name: Poll — auditing client
+        id: poll_audit
+        if: always()
+        run: |
+          RESPONSE=$(curl -s \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            "${SUPABASE_URL}/rest/v1/clients?status=eq.auditing&limit=1")
+
+          COUNT=$(echo "$RESPONSE" | jq 'if type=="array" then length else 0 end' 2>/dev/null || echo 0)
+
+          if [[ "$COUNT" -gt 0 ]]; then
+            echo "Found ${COUNT} auditing client(s)."
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No auditing clients."
+            echo "found=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Auditor Agent
+        if: always() && steps.poll_audit.outputs.found == 'true'
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN:      ${{ secrets.GH_PAT }}
+          GH_OWNER:          ${{ secrets.GH_OWNER }}
+          GH_REPO:           ${{ secrets.GH_REPO }}
+        run: node agents/auditor.js
+
+      # ── Stage C: status='qa' → QA ─────────────────────────────────────────
+      - name: Poll — qa client
+        id: poll_qa
+        if: always()
+        run: |
+          RESPONSE=$(curl -s \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            "${SUPABASE_URL}/rest/v1/clients?status=eq.qa&limit=1")
+
+          COUNT=$(echo "$RESPONSE" | jq 'if type=="array" then length else 0 end' 2>/dev/null || echo 0)
+
+          if [[ "$COUNT" -gt 0 ]]; then
+            echo "Found ${COUNT} QA client(s)."
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No QA clients."
+            echo "found=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Playwright browser (QA)
+        if: always() && steps.poll_qa.outputs.found == 'true'
+        run: npx playwright install chromium --with-deps
+
+      - name: Run QA Agent
+        if: always() && steps.poll_qa.outputs.found == 'true'
+        continue-on-error: true
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          GITHUB_TOKEN:   ${{ secrets.GH_PAT }}
+          GH_OWNER:       ${{ secrets.GH_OWNER }}
+          GH_REPO:        ${{ secrets.GH_REPO }}
+        run: node agents/qa.js
+
+# ── Manual Build ──────────────────────────────────────────────────────────────
+# Triggered by the dashboard "Build Now" button (via trigger-builder edge fn)
+# or directly from GitHub Actions → Run workflow.
+# Builds the specific client identified by client_id.
+  manual_build:
+    name: Manual Build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,74 +197,15 @@ jobs:
           GITHUB_TOKEN:      ${{ secrets.GH_PAT }}
           GH_OWNER:          ${{ secrets.GH_OWNER }}
           GH_REPO:           ${{ secrets.GH_REPO }}
-        run: node agents/builder.js ${{ github.event.inputs.client_id }}
-
-# ── Auditor ───────────────────────────────────────────────────────────────────
-# Triggered by the trigger-auditor Supabase Edge Function when a client row
-# status changes to 'auditing'.  Picks the oldest queued record automatically.
-  auditor:
-    name: Auditor Agent
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'audit'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run Auditor Agent
-        env:
-          SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GITHUB_TOKEN:      ${{ secrets.GH_PAT }}
-          GH_OWNER:          ${{ secrets.GH_OWNER }}
-          GH_REPO:           ${{ secrets.GH_REPO }}
-        run: node agents/auditor.js
-
-# ── QA ────────────────────────────────────────────────────────────────────────
-# Triggered by the trigger-qa Supabase Edge Function when a client row
-# status changes to 'qa'.  Picks the oldest queued record automatically.
-  qa:
-    name: QA Agent
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'qa'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright browser
-        run: npx playwright install chromium --with-deps
-
-      - name: Run QA Agent
-        env:
-          SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          RESEND_API_KEY:    ${{ secrets.RESEND_API_KEY }}
-          GITHUB_TOKEN:      ${{ secrets.GH_PAT }}
-          GH_OWNER:          ${{ secrets.GH_OWNER }}
-          GH_REPO:           ${{ secrets.GH_REPO }}
-        run: node agents/qa.js
+          CLIENT_ID:         ${{ github.event.inputs.client_id }}
+        run: |
+          if [[ -z "$CLIENT_ID" ]]; then
+            echo "No client_id provided — nothing to do."
+            exit 0
+          fi
+          node agents/builder.js
 
 # ── Security ──────────────────────────────────────────────────────────────────
-# Runs daily at midnight UTC.
-# Probes all delivered client URLs with Playwright and checks for stuck agents.
   security:
     name: Security Agent
     runs-on: ubuntu-latest
@@ -157,8 +234,6 @@ jobs:
         run: node agents/security.js
 
 # ── Analyst ───────────────────────────────────────────────────────────────────
-# Runs every Monday at 08:00 UTC.
-# Sends weekly analytics reports for all delivered clients.
   analyst:
     name: Analyst Agent
     runs-on: ubuntu-latest

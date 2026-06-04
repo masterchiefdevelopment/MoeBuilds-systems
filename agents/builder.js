@@ -296,7 +296,7 @@ async function main() {
 
   // Step 1: Validate CLI arguments
   // slice(2) skips argv[0] (node binary) and argv[1] (script path).
-  const clientId = process.argv.slice(2).find(a => !a.startsWith('-'));
+  const clientId = process.env.CLIENT_ID || process.argv.slice(2).find(a => !a.startsWith('-'));
   if (!TEST_MODE && !clientId) {
     console.error('Usage: node agents/builder.js <client_id>');
     console.error('       node agents/builder.js --test');

@@ -99,6 +99,24 @@ create table public.analytics (
 );
 ```
 
+#### Supabase RLS Policies
+
+The GitHub Actions poller uses the **anon key** to query and update the `clients` table. If RLS is enabled on the table (it is by default), you must add these policies — otherwise the PATCH to claim a client will return HTTP 403 and the agent won't run.
+
+Run in the Supabase SQL editor:
+
+```sql
+-- Required for poller to read clients
+create policy "anon can read clients"
+  on public.clients for select to anon using (true);
+
+-- Required for poller to claim clients (PATCH status)
+create policy "anon can update client status"
+  on public.clients for update to anon using (true) with check (true);
+```
+
+> If the poller step logs `⚠ PATCH returned HTTP 403` or `0 rows updated`, these policies are missing.
+
 ---
 
 ### 2. Deploy Supabase Edge Functions
