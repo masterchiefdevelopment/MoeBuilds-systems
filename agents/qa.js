@@ -209,17 +209,23 @@ async function runPlaywrightTests(testUrl) {
 }
 
 // ─── Resend: notify owner ──────────────────────────────────────────────────
-async function sendNotificationEmail(resend, client, liveUrl) {
+async function sendNotificationEmail(resend, client, vercelUrl) {
   log('EMAIL', `Sending delivery notification to ${NOTIFY_EMAIL}`);
 
   const { data, error } = await resend.emails.send({
     from: 'MoeBuilds System <onboarding@resend.dev>',
     to: [NOTIFY_EMAIL],
-    subject: 'Client app ready for delivery',
+    subject: `Site delivered — ${client.business_name}`,
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:600px;margin:auto;padding:32px">
-        <h2 style="color:#16a34a;margin-bottom:8px">✅ Client Site Ready for Delivery</h2>
-        <p style="color:#555">All QA checks passed. Here are the details:</p>
+        <h2 style="color:#16a34a;margin-bottom:8px">✅ Client Site Delivered</h2>
+        <p style="color:#555">All QA checks passed. The site is live on Vercel:</p>
+
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px 20px;margin:20px 0">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#16a34a;margin-bottom:6px">Vercel Preview URL</div>
+          <a href="${vercelUrl}" style="color:#2563eb;font-size:15px;word-break:break-all">${vercelUrl}</a>
+        </div>
+
         <table style="border-collapse:collapse;margin:20px 0;width:100%">
           <tr style="border-bottom:1px solid #eee">
             <td style="padding:8px 16px 8px 0;color:#888;font-size:13px">Business</td>
@@ -233,17 +239,13 @@ async function sendNotificationEmail(resend, client, liveUrl) {
             <td style="padding:8px 16px 8px 0;color:#888;font-size:13px">Package</td>
             <td style="padding:8px 0;text-transform:capitalize">${client.package}</td>
           </tr>
-          <tr style="border-bottom:1px solid #eee">
+          <tr>
             <td style="padding:8px 16px 8px 0;color:#888;font-size:13px">Branch</td>
             <td style="padding:8px 0;font-family:monospace;font-size:13px">${client.github_branch}</td>
           </tr>
-          <tr>
-            <td style="padding:8px 16px 8px 0;color:#888;font-size:13px">Live URL</td>
-            <td style="padding:8px 0"><a href="${liveUrl}" style="color:#2563eb">${liveUrl}</a></td>
-          </tr>
         </table>
-        <a href="${liveUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;margin-top:8px">
-          View Live Site →
+        <a href="${vercelUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;margin-top:8px">
+          View Delivered Site →
         </a>
         <p style="margin-top:32px;font-size:12px;color:#aaa">Moe Builds Co. — Automated Build Pipeline</p>
       </div>
@@ -366,24 +368,24 @@ async function main() {
     log('RESULT', 'PASSED — all checks passed');
     log('RESULT', '─'.repeat(55));
 
-    const { error: readyErr } = await supabase
+    // Derive Vercel preview URL from branch name (slashes → dashes)
+    const branchSlug = client.github_branch.replace(/\//g, '-');
+    const vercelUrl  = `https://moe-builds-co-git-${branchSlug}.vercel.app`;
+
+    const { error: deliveredErr } = await supabase
       .from('clients')
-      .update({ status: 'ready', qa_notes: null })
+      .update({ status: 'delivered', qa_notes: null, preview_url: vercelUrl })
       .eq('id', client.id);
 
-    if (readyErr) log('SUPABASE', `Warning: status update to ready failed: ${readyErr.message}`);
-    else log('SUPABASE', `Status → 'ready'`);
-
-    // Construct live URL — prefer preview_url, fall back to GitHub branch URL
-    const liveUrl = client.preview_url
-      || `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/tree/${client.github_branch}`;
+    if (deliveredErr) log('SUPABASE', `Warning: status update to delivered failed: ${deliveredErr.message}`);
+    else log('SUPABASE', `Status → 'delivered' | preview_url → ${vercelUrl}`);
 
     try {
-      await sendNotificationEmail(resend, client, liveUrl);
-      log('DONE', `QA passed — client ready for delivery. Notification sent to ${NOTIFY_EMAIL}.`);
+      await sendNotificationEmail(resend, client, vercelUrl);
+      log('DONE', `QA passed — client delivered. Notification sent to ${NOTIFY_EMAIL}.`);
     } catch (emailErr) {
       log('EMAIL', `Warning: notification email failed: ${emailErr.message}`);
-      log('DONE', 'QA passed — client ready for delivery (email notification failed).');
+      log('DONE', 'QA passed — client delivered (email notification failed).');
     }
   }
 }
