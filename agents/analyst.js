@@ -34,10 +34,10 @@ async function fetchAnalytics(supabase, clientId) {
 
   const { data, error } = await supabase
     .from('analytics')
-    .select('event_type, page, referrer, created_at')
+    .select('event_type, page, referrer, recorded_at')
     .eq('client_id', clientId)
-    .gte('created_at', since)
-    .order('created_at', { ascending: false });
+    .gte('recorded_at', since)
+    .order('recorded_at', { ascending: false });
 
   if (error) throw new Error(`Analytics fetch failed for ${clientId}: ${error.message}`);
   return data || [];
@@ -50,7 +50,7 @@ function aggregateStats(rows) {
   const conversions = rows.filter(r => r.event_type === 'conversion');
 
   // Unique days with any activity
-  const activeDays = new Set(rows.map(r => r.created_at.slice(0, 10))).size;
+  const activeDays = new Set(rows.map(r => r.recorded_at.slice(0, 10))).size;
 
   // Top pages by view count
   const pageCounts = pageviews.reduce((acc, r) => {

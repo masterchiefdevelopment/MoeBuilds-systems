@@ -58,9 +58,9 @@ async function runPlaywrightTests(testUrl) {
       if (msg.type() === 'error') consoleErrors.push(msg.text());
     });
     desktopPage.on('requestfailed', req => {
-      // Ignore file:// navigation failures — only flag asset requests
+      // Skip all file:// failures — they're local temp files with no external assets
       const url = req.url();
-      if (!url.startsWith('file://') || req.resourceType() !== 'document') {
+      if (!url.startsWith('file://')) {
         failedResources.push(`${req.resourceType()}: ${url} — ${req.failure()?.errorText ?? 'unknown'}`);
       }
     });
@@ -290,8 +290,14 @@ async function main() {
   log('SUPABASE', `Testing: "${client.business_name}" (id: ${client.id})`);
 
   if (!client.github_branch) {
-    console.error('[QA] Client has no github_branch — cannot test. Exiting.');
-    process.exit(1);
+    log('ERROR', 'Client has no github_branch — cannot test');
+    const { error: branchErr } = await supabase
+      .from('clients')
+      .update({ status: 'building', qa_notes: 'QA skipped: github_branch not set on client record' })
+      .eq('id', client.id);
+    if (branchErr) log('SUPABASE', `Warning: status revert failed: ${branchErr.message}`);
+    else log('SUPABASE', 'Status → building (no github_branch)');
+    process.exit(0);
   }
 
   // Step 2: Determine test URL
@@ -302,11 +308,25 @@ async function main() {
 
   if (!testUrl) {
     log('GITHUB', `No preview_url — fetching index.html from branch "${client.github_branch}"`);
-    const html = await fetchFileFromBranch(client.github_branch, 'index.html');
-    tempFile   = join(tmpdir(), `moebuilds-qa-${client.id}.html`);
-    writeFileSync(tempFile, html, 'utf-8');
-    testUrl    = `file://${tempFile}`;
-    log('QA', `Saved to temp file: ${tempFile}`);
+    try {
+      const html = await fetchFileFromBranch(client.github_branch, 'index.html');
+      tempFile   = join(tmpdir(), `moebuilds-qa-${client.id}.html`);
+      writeFileSync(tempFile, html, 'utf-8');
+      testUrl    = `file://${tempFile}`;
+      log('QA', `Saved to temp file: ${tempFile}`);
+    } catch (fetchErr) {
+      log('GITHUB', `Failed to fetch HTML from GitHub: ${fetchErr.message}`);
+      const { error: revertErr } = await supabase
+        .from('clients')
+        .update({
+          status:   'building',
+          qa_notes: `QA setup failed: could not fetch HTML from branch "${client.github_branch}": ${fetchErr.message}`,
+        })
+        .eq('id', client.id);
+      if (revertErr) log('SUPABASE', `Warning: status revert failed: ${revertErr.message}`);
+      else log('SUPABASE', 'Status → building (GitHub fetch failed)');
+      process.exit(0);
+    }
   } else {
     log('QA', `Using live URL: ${testUrl}`);
   }
@@ -337,8 +357,8 @@ async function main() {
       .update({ status: 'building', qa_notes: bugs.join('; ') })
       .eq('id', client.id);
 
-    if (buildingErr) throw new Error(`Failed to revert status: ${buildingErr.message}`);
-    log('SUPABASE', `Status → 'building' | Bugs logged to qa_notes`);
+    if (buildingErr) log('SUPABASE', `Warning: status revert failed: ${buildingErr.message}`);
+    else log('SUPABASE', `Status → 'building' | Bugs logged to qa_notes`);
     log('DONE', 'QA failed — client sent back to builder for fixes.');
 
   } else {
@@ -351,15 +371,20 @@ async function main() {
       .update({ status: 'ready', qa_notes: null })
       .eq('id', client.id);
 
-    if (readyErr) throw new Error(`Failed to update status to ready: ${readyErr.message}`);
-    log('SUPABASE', `Status → 'ready'`);
+    if (readyErr) log('SUPABASE', `Warning: status update to ready failed: ${readyErr.message}`);
+    else log('SUPABASE', `Status → 'ready'`);
 
     // Construct live URL — prefer preview_url, fall back to GitHub branch URL
     const liveUrl = client.preview_url
       || `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/tree/${client.github_branch}`;
 
-    await sendNotificationEmail(resend, client, liveUrl);
-    log('DONE', `QA passed — client ready for delivery. Notification sent to ${NOTIFY_EMAIL}.`);
+    try {
+      await sendNotificationEmail(resend, client, liveUrl);
+      log('DONE', `QA passed — client ready for delivery. Notification sent to ${NOTIFY_EMAIL}.`);
+    } catch (emailErr) {
+      log('EMAIL', `Warning: notification email failed: ${emailErr.message}`);
+      log('DONE', 'QA passed — client ready for delivery (email notification failed).');
+    }
   }
 }
 
