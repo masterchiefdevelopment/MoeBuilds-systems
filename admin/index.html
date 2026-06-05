@@ -615,10 +615,18 @@
 
         if (error) throw error;
 
-        // Trigger the pipeline poller immediately (fire-and-forget).
+        // Trigger pipeline (non-blocking — show success immediately, log result in DevTools).
         // GITHUB_PAT is read server-side in the Vercel function — never in the browser.
-        fetch('/api/trigger-pipeline', { method: 'POST' })
-          .catch(err => console.warn('[trigger-pipeline] Could not trigger pipeline:', err.message));
+        (async () => {
+          try {
+            const r    = await fetch('/api/trigger-pipeline', { method: 'POST' });
+            const body = await r.json();
+            if (r.ok) console.log('[trigger-pipeline] Dispatched ok:', body);
+            else      console.error('[trigger-pipeline] Error', r.status, ':', body);
+          } catch (err) {
+            console.warn('[trigger-pipeline] Fetch failed:', err.message);
+          }
+        })();
 
         // Show success state
         document.getElementById('intakeForm').style.display  = 'none';
